@@ -18,6 +18,9 @@
 			<attribute name="Material" value="Material;Materials/Stone.xml" />
 		</component>
 		<component type="CollisionShape" id="8" />
+		<component type="RigidBody" id="22">
+			<attribute name="Physics Position" value="0.5 0.5 0.5" />
+		</component>
 	</node>
 	<node id="2">
 		<attribute name="Is Enabled" value="true" />
@@ -31,6 +34,9 @@
 			<attribute name="Material" value="Material;Materials/Stone.xml" />
 		</component>
 		<component type="CollisionShape" id="7" />
+		<component type="RigidBody" id="23">
+			<attribute name="Physics Position" value="-0.5 0.5 0.5" />
+		</component>
 	</node>
 	<node id="11">
 		<attribute name="Is Enabled" value="true" />
@@ -44,6 +50,9 @@
 			<attribute name="Material" value="Material;Materials/Stone.xml" />
 		</component>
 		<component type="CollisionShape" id="19" />
+		<component type="RigidBody" id="24">
+			<attribute name="Physics Position" value="0.5 0.5 -0.5" />
+		</component>
 	</node>
 	<node id="12">
 		<attribute name="Is Enabled" value="true" />
@@ -57,5 +66,8 @@
 			<attribute name="Material" value="Material;Materials/Stone.xml" />
 		</component>
 		<component type="CollisionShape" id="21" />
+		<component type="RigidBody" id="25">
+			<attribute name="Physics Position" value="-0.5 0.5 -0.5" />
+		</component>
 	</node>
 </node>

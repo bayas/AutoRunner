@@ -49,6 +49,7 @@
 
 #include "AutoRunner.h"
 
+#include "XMLFile.h"
 #include "DebugNew.h"
 
 // Expands to this example's entry-point
@@ -89,10 +90,14 @@ void AutoRunner::Start()
 void AutoRunner::InitScene()
 {
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
+	FileSystem* fs = GetSubsystem<FileSystem>();
 
 	scene_ = new Scene(context_);
-	File loadFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/AutoRunner.xml", FILE_READ);
+	File loadFile(context_, fs->GetProgramDir() + "Data/Scenes/AutoRunner.xml", FILE_READ);
 	scene_->LoadXML(loadFile);
+
+	XMLFile* xml = cache->GetResource<XMLFile>("Objects/RoadBlock.xml");
+	Node* blockNode = scene_->InstantiateXML(xml->GetRoot(), Vector3(-1, 2, 0), Quaternion::IDENTITY);
 
 	if (GetPlatform() == "Android" || GetPlatform() == "iOS")
 	{

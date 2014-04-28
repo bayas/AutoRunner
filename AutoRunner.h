@@ -33,21 +33,16 @@ namespace Urho3D
 class Character;
 class Touch;
 
-/// This first example, maintaining tradition, prints a "Hello World" message.
-/// Furthermore it shows:
-///     - Using the Sample / Application classes, which initialize the Urho3D engine and run the main loop
-///     - Adding a Text element to the graphical user interface
-///     - Subscribing to and handling of update events
 class AutoRunner : public Sample
 {
-    OBJECT(AutoRunner);
+	OBJECT(AutoRunner);
 
 public:
-    /// Construct.
-    AutoRunner(Context* context);
+	/// Construct.
+	AutoRunner(Context* context);
 
-    /// Setup after engine initialization and before running the main loop.
-    virtual void Start();
+	/// Setup after engine initialization and before running the main loop.
+	virtual void Start();
 
 private:
 	/// Create static scene content.
