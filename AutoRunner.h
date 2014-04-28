@@ -24,27 +24,49 @@
 
 #include "Sample.h"
 
+namespace Urho3D
+{
+	class Node;
+	class Scene;
+}
+
+class Character;
+class Touch;
+
 /// This first example, maintaining tradition, prints a "Hello World" message.
 /// Furthermore it shows:
 ///     - Using the Sample / Application classes, which initialize the Urho3D engine and run the main loop
 ///     - Adding a Text element to the graphical user interface
 ///     - Subscribing to and handling of update events
-class HelloWorld : public Sample
+class AutoRunner : public Sample
 {
-    OBJECT(HelloWorld);
+    OBJECT(AutoRunner);
 
 public:
     /// Construct.
-    HelloWorld(Context* context);
+    AutoRunner(Context* context);
 
     /// Setup after engine initialization and before running the main loop.
     virtual void Start();
 
 private:
-    /// Construct a new Text instance, containing the 'Hello World' String, and add it to the UI root element.
-    void CreateText();
-    /// Subscribe to application-wide logic update events.
-    void SubscribeToEvents();
-    /// Handle the logic update event.
-    void HandleUpdate(StringHash eventType, VariantMap& eventData);
+	/// Create static scene content.
+	void InitScene();
+	/// Create controllable character.
+	void CreateCharacter();
+	/// Subscribe to necessary events.
+	void SubscribeToEvents();
+	/// Handle application update. Set controls to character.
+	void HandleUpdate(StringHash eventType, VariantMap& eventData);
+	/// Handle application post-update. Update camera position after character has moved.
+	void HandlePostUpdate(StringHash eventType, VariantMap& eventData);
+
+	/// Scene.
+	SharedPtr<Scene> scene_;
+	/// Camera scene node.
+	SharedPtr<Node> cameraNode_;
+	/// Touch utility object.
+	SharedPtr<Touch> touch_;
+	/// The controllable character component.
+	WeakPtr<Character> character_;
 };

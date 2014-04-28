@@ -27,62 +27,71 @@
 #include "ProcessUtils.h"
 #include "Text.h"
 #include "UI.h"
+#include "ResourceCache.h"
+#include "Scene.h"
+#include "StaticModel.h"
 
 #include "AutoRunner.h"
 
 #include "DebugNew.h"
+#include "Touch.h"
 
 // Expands to this example's entry-point
-DEFINE_APPLICATION_MAIN(HelloWorld)
+DEFINE_APPLICATION_MAIN(AutoRunner)
 
-HelloWorld::HelloWorld(Context* context) :
+AutoRunner::AutoRunner(Context* context) :
     Sample(context)
 {
 }
 
-void HelloWorld::Start()
+void AutoRunner::Start()
 {
-    // Execute base class startup
-    Sample::Start();
+	// Execute base class startup
+	Sample::Start();
+	
+	// Init scene content
+	InitScene();
 
-    // Create "Hello World" Text
-    CreateText();
+	// Create the controllable character
+	CreateCharacter();
 
-    // Finally subscribe to the update event. Note that by subscribing events at this point we have already missed some events
-    // like the ScreenMode event sent by the Graphics subsystem when opening the application window. To catch those as well we
-    // could subscribe in the constructor instead.
-    SubscribeToEvents();
+	// Activate mobile stuff when appropriate
+#if defined(ANDROID) || defined(IOS)
+	SetLogoVisible(false);
+	InitTouchInput();
+#endif
+
+	// Subscribe to necessary events
+	SubscribeToEvents();
 }
 
-void HelloWorld::CreateText()
+void AutoRunner::InitScene()
 {
-    ResourceCache* cache = GetSubsystem<ResourceCache>();
+	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-    // Construct new Text object
-    SharedPtr<Text> helloText(new Text(context_));
-
-    // Set String to display
-    helloText->SetText("Hello World from Urho3D!");
-
-    // Set font and text color
-    helloText->SetFont(cache->GetResource<Font>("Fonts/Anonymous Pro.ttf"), 30);
-    helloText->SetColor(Color(0.0f, 1.0f, 0.0f));
-
-    // Align Text center-screen
-    helloText->SetHorizontalAlignment(HA_CENTER);
-    helloText->SetVerticalAlignment(VA_CENTER);
-
-    // Add Text instance to the UI root element
-    GetSubsystem<UI>()->GetRoot()->AddChild(helloText);
+	scene_ = new Scene(context_);
+	File loadFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/AutoRunner.xml", FILE_READ);
+	scene_->LoadXML(loadFile);
 }
 
-void HelloWorld::SubscribeToEvents()
+void AutoRunner::CreateCharacter()
+{
+	// TODO: implement character.
+}
+
+void AutoRunner::SubscribeToEvents()
 {
     // Subscribe HandleUpdate() function for processing update events
-    SubscribeToEvent(E_UPDATE, HANDLER(HelloWorld, HandleUpdate));
+    SubscribeToEvent(E_UPDATE, HANDLER(AutoRunner, HandleUpdate));
 }
 
-void HelloWorld::HandleUpdate(StringHash eventType, VariantMap& eventData)
+void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 {
-    // Do nothing for now, could be extended to eg. animate the display
+    // Do nothing for now, could be extended to eg. animate the display.
+}
+
+
+void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
+{
+
 }
