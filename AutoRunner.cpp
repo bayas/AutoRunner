@@ -20,23 +20,36 @@
 // THE SOFTWARE.
 //
 
+#include "AnimatedModel.h"
+#include "AnimationController.h"
+#include "Camera.h"
+#include "Character.h"
+#include "CollisionShape.h"
+#include "Controls.h"
 #include "CoreEvents.h"
 #include "Engine.h"
+#include "FileSystem.h"
 #include "Font.h"
 #include "Input.h"
+#include "Light.h"
+#include "Material.h"
+#include "Model.h"
+#include "Octree.h"
+#include "PhysicsWorld.h"
 #include "ProcessUtils.h"
-#include "Text.h"
-#include "UI.h"
+#include "Renderer.h"
+#include "RigidBody.h"
 #include "ResourceCache.h"
 #include "Scene.h"
 #include "StaticModel.h"
+#include "Text.h"
+#include "Touch.h"
+#include "UI.h"
+#include "Zone.h"
 
 #include "AutoRunner.h"
 
 #include "DebugNew.h"
-#include "Touch.h"
-#include "Node.h"
-#include "Camera.h"
 
 // Expands to this example's entry-point
 DEFINE_APPLICATION_MAIN(AutoRunner)
@@ -91,7 +104,42 @@ void AutoRunner::InitScene()
 
 void AutoRunner::CreateCharacter()
 {
-	// TODO: implement character.
+	ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+	Node* objectNode = scene_->CreateChild("Jack");
+	objectNode->SetPosition(Vector3(0.0f, 100.0f, 0.0f));
+
+	// Create the rendering component + animation controller
+	AnimatedModel* object = objectNode->CreateComponent<AnimatedModel>();
+	object->SetModel(cache->GetResource<Model>("Models/Jack.mdl"));
+	object->SetMaterial(cache->GetResource<Material>("Materials/Jack.xml"));
+	object->SetCastShadows(true);
+	objectNode->CreateComponent<AnimationController>();
+
+	// Set the head bone for manual control
+	object->GetSkeleton().GetBone("Bip01_Head")->animated_ = false;
+
+	// Create rigidbody, and set non-zero mass so that the body becomes dynamic
+	RigidBody* body = objectNode->CreateComponent<RigidBody>();
+	body->SetCollisionLayer(1);
+	body->SetMass(1.0f);
+
+	// Set zero angular factor so that physics doesn't turn the character on its own.
+	// Instead we will control the character yaw manually
+	body->SetAngularFactor(Vector3::ZERO);
+
+	// Set the rigidbody to signal collision also when in rest, so that we get ground collisions properly
+	body->SetCollisionEventMode(COLLISION_ALWAYS);
+
+	// Set a capsule shape for collision
+	CollisionShape* shape = objectNode->CreateComponent<CollisionShape>();
+	shape->SetCapsule(0.7f, 1.8f, Vector3(0.0f, 0.9f, 0.0f));
+
+	// Create the character logic component, which takes care of steering the rigidbody
+	// Remember it so that we can set the controls. Use a WeakPtr because the scene hierarchy already owns it
+	// and keeps it alive as long as it's not removed from the hierarchy
+	character_ = objectNode->CreateComponent<Character>();
+
 }
 
 void AutoRunner::CreateCamera()
@@ -149,11 +197,65 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 {
 	using namespace Update;
 
-	// Take the frame time step, which is stored as a float
 	float timeStep = eventData[P_TIMESTEP].GetFloat();
+	Input* input = GetSubsystem<Input>();
 
-	// Move the camera, scale movement with time step
-	MoveCamera(timeStep);
+	if (character_)
+	{
+		// Clear previous controls
+		character_->controls_.Set(CTRL_FORWARD | CTRL_BACK | CTRL_LEFT | CTRL_RIGHT | CTRL_JUMP, false);
+
+		if (touch_->touchEnabled_)
+		{
+			// Update controls using touch (mobile)
+			touch_->UpdateTouches(character_->controls_);
+		}
+		else
+		{
+			// Update controls using keys (desktop)
+			UI* ui = GetSubsystem<UI>();
+
+			if (!ui->GetFocusElement())
+			{
+				character_->controls_.Set(CTRL_FORWARD, input->GetKeyDown('W'));
+				character_->controls_.Set(CTRL_BACK, input->GetKeyDown('S'));
+				character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('A'));
+				character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('D'));
+				character_->controls_.Set(CTRL_JUMP, input->GetKeyDown(KEY_SPACE));
+
+				// Add character yaw & pitch from the mouse motion
+				character_->controls_.yaw_ += (float)input->GetMouseMoveX() * YAW_SENSITIVITY;
+				character_->controls_.pitch_ += (float)input->GetMouseMoveY() * YAW_SENSITIVITY;
+				// Limit pitch
+				character_->controls_.pitch_ = Clamp(character_->controls_.pitch_, -80.0f, 80.0f);
+
+				// Switch between 1st and 3rd person
+				if (input->GetKeyPress('F'))
+					touch_->firstPerson_ = touch_->newFirstPerson_ = !touch_->firstPerson_;
+
+				// Check for loading / saving the scene
+				if (input->GetKeyPress(KEY_F5))
+				{
+					File saveFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/CharacterDemo.xml",
+						FILE_WRITE);
+					scene_->SaveXML(saveFile);
+				}
+				if (input->GetKeyPress(KEY_F7))
+				{
+					File loadFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/CharacterDemo.xml", FILE_READ);
+					scene_->LoadXML(loadFile);
+					// After loading we have to reacquire the weak pointer to the Character component, as it has been recreated
+					// Simply find the character's scene node by name as there's only one of them
+					Node* characterNode = scene_->GetChild("Jack", true);
+					if (characterNode)
+						character_ = characterNode->GetComponent<Character>();
+				}
+			}
+		}
+
+		// Set rotation already here so that it's updated every rendering frame instead of every physics frame
+		character_->GetNode()->SetRotation(Quaternion(character_->controls_.yaw_, Vector3::UP));
+	}
 }
 
 

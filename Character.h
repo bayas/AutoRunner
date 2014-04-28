@@ -48,11 +48,11 @@ class Character : public LogicComponent
 public:
     /// Construct.
     Character(Context* context);
-    
+
     /// Register object factory and attributes.
     static void RegisterObject(Context* context);
     
-    /// Handle startup. Called by LogicComponent base class.
+    /// Handle startup. Called by LogicComponent base class. Creates model and loads animations.
     virtual void Start();
     /// Handle physics world update. Called by LogicComponent base class.
     virtual void FixedUpdate(float timeStep);
@@ -63,7 +63,7 @@ public:
 private:
     /// Handle physics collision event.
     void HandleNodeCollision(StringHash eventType, VariantMap& eventData);
-    
+
     /// Grounded flag for movement.
     bool onGround_;
     /// Jump flag.
