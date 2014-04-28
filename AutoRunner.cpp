@@ -57,9 +57,11 @@ DEFINE_APPLICATION_MAIN(AutoRunner)
 
 AutoRunner::AutoRunner(Context* context) :
     Sample(context),
+	touch_(new Touch(context)),
     yaw_(0.0f),
     pitch_(0.0f)
 {
+	Character::RegisterObject(context);
 }
 
 void AutoRunner::Start()
@@ -112,7 +114,7 @@ void AutoRunner::CreateCharacter()
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
 	Node* objectNode = scene_->CreateChild("Jack");
-	objectNode->SetPosition(Vector3(0.0f, 100.0f, 0.0f));
+	objectNode->SetPosition(Vector3(0.0f, 3.0f, 0.0f));
 
 	// Create the rendering component + animation controller
 	AnimatedModel* object = objectNode->CreateComponent<AnimatedModel>();
@@ -205,6 +207,8 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 	float timeStep = eventData[P_TIMESTEP].GetFloat();
 	Input* input = GetSubsystem<Input>();
 
+	MoveCamera(timeStep);
+
 	if (character_)
 	{
 		// Clear previous controls
@@ -222,10 +226,10 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 
 			if (!ui->GetFocusElement())
 			{
-				character_->controls_.Set(CTRL_FORWARD, input->GetKeyDown('W'));
-				character_->controls_.Set(CTRL_BACK, input->GetKeyDown('S'));
-				character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('A'));
-				character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('D'));
+				character_->controls_.Set(CTRL_FORWARD, input->GetKeyDown('Y'));
+				character_->controls_.Set(CTRL_BACK, input->GetKeyDown('H'));
+				character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('G'));
+				character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('J'));
 				character_->controls_.Set(CTRL_JUMP, input->GetKeyDown(KEY_SPACE));
 
 				// Add character yaw & pitch from the mouse motion
