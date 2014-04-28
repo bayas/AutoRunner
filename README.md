@@ -1,7 +1,7 @@
 AutoRunner
 ==========
 
-Sample runner game in using Urho3D Game Engine.
+Simple runner game by using Urho3D Game Engine.
 
 Urho3D
 -------------------------------------------------
