@@ -54,6 +54,8 @@ private:
 	void InitScene();
 	/// Create controllable character.
 	void CreateCharacter();
+	/// Create camera.
+	void CreateCamera();
 	/// Subscribe to necessary events.
 	void SubscribeToEvents();
 	/// Handle application update. Set controls to character.

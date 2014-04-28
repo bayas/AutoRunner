@@ -35,6 +35,8 @@
 
 #include "DebugNew.h"
 #include "Touch.h"
+#include "Node.h"
+#include "Camera.h"
 
 // Expands to this example's entry-point
 DEFINE_APPLICATION_MAIN(AutoRunner)
@@ -77,6 +79,14 @@ void AutoRunner::InitScene()
 void AutoRunner::CreateCharacter()
 {
 	// TODO: implement character.
+}
+
+void AutoRunner::CreateCamera()
+{
+	cameraNode_ = new Node(context_);
+	Camera* camera = cameraNode_->CreateComponent<Camera>();
+	camera->SetFarClip(300.0f);
+	GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
 }
 
 void AutoRunner::SubscribeToEvents()

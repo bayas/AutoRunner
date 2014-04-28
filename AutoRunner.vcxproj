@@ -54,7 +54,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>.\;.\include\SDL;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;include;include\Box2D;include\Bullet\src;include\kNet\include;include\SDL;include\AngelScript\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\;.\include\SDL;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;include;include\Box2D;include\Bullet;include\kNet\include;include\SDL;include\AngelScript\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>Debug/</AssemblerListingLocation>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <CompileAs>CompileAsCpp</CompileAs>
@@ -98,7 +98,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>.\;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;include;include\Box2D;include\Bullet\src;include\kNet\include;include\SDL;include\AngelScript\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;include;include\Box2D;include\Bullet;include\kNet\include;include\SDL;include\AngelScript\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>Release/</AssemblerListingLocation>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <CompileAs>CompileAsCpp</CompileAs>
@@ -144,10 +144,14 @@
     </ProjectReference>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Character.cpp" />
+    <ClCompile Include="Touch.cpp" />
     <ClInclude Include="AutoRunner.h" />
+    <ClInclude Include="Character.h" />
     <ClInclude Include="Sample.h" />
     <ClInclude Include="Sample.inl" />
     <ClCompile Include="AutoRunner.cpp" />
+    <ClInclude Include="Touch.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
