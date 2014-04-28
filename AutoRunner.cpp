@@ -99,14 +99,11 @@ void AutoRunner::InitScene()
 	scene_->LoadXML(loadFile);
 
 	XMLFile* xml = cache->GetResource<XMLFile>("Objects/RoadBlock.xml");
-	Node* blockNode = scene_->InstantiateXML(xml->GetRoot(), Vector3(-1, 2, 0), Quaternion::IDENTITY);
+	Node* blockNode = scene_->InstantiateXML(xml->GetRoot(), Vector3(0, 0, 0), Quaternion::IDENTITY);
 
-	if (GetPlatform() == "Android" || GetPlatform() == "iOS")
-	{
-		// Pass knowledge of the scene & camera node to the Touch helper object.
-		touch_->scene_ = scene_;
-		touch_->cameraNode_ = cameraNode_;
-	}
+	// Pass knowledge of the scene & camera node to the Touch helper object.
+	touch_->scene_ = scene_;
+	touch_->cameraNode_ = cameraNode_;
 }
 
 void AutoRunner::CreateCharacter()
