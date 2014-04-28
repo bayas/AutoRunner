@@ -42,7 +42,9 @@
 DEFINE_APPLICATION_MAIN(AutoRunner)
 
 AutoRunner::AutoRunner(Context* context) :
-    Sample(context)
+    Sample(context),
+    yaw_(0.0f),
+    pitch_(0.0f)
 {
 }
 
@@ -54,17 +56,21 @@ void AutoRunner::Start()
 	// Init scene content
 	InitScene();
 
+	// Create Camera
+	CreateCamera();
+
 	// Create the controllable character
 	CreateCharacter();
 
-	// Activate mobile stuff when appropriate
-#if defined(ANDROID) || defined(IOS)
-	SetLogoVisible(false);
-	InitTouchInput();
-#endif
-
 	// Subscribe to necessary events
 	SubscribeToEvents();
+
+	// Initialize touch input on Android & iOS
+	if (GetPlatform() == "Android" || GetPlatform() == "iOS")
+	{
+		SetLogoVisible(false);
+		touch_->InitTouchInput();
+	}
 }
 
 void AutoRunner::InitScene()
@@ -74,6 +80,13 @@ void AutoRunner::InitScene()
 	scene_ = new Scene(context_);
 	File loadFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/AutoRunner.xml", FILE_READ);
 	scene_->LoadXML(loadFile);
+
+	if (GetPlatform() == "Android" || GetPlatform() == "iOS")
+	{
+		// Pass knowledge of the scene & camera node to the Touch helper object.
+		touch_->scene_ = scene_;
+		touch_->cameraNode_ = cameraNode_;
+	}
 }
 
 void AutoRunner::CreateCharacter()
@@ -84,8 +97,10 @@ void AutoRunner::CreateCharacter()
 void AutoRunner::CreateCamera()
 {
 	cameraNode_ = new Node(context_);
+	cameraNode_->SetPosition(Vector3(0.0f, 5.0f, 0.0f));
 	Camera* camera = cameraNode_->CreateComponent<Camera>();
 	camera->SetFarClip(300.0f);
+
 	GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
 }
 
@@ -95,9 +110,50 @@ void AutoRunner::SubscribeToEvents()
     SubscribeToEvent(E_UPDATE, HANDLER(AutoRunner, HandleUpdate));
 }
 
+void AutoRunner::MoveCamera(float timeStep)
+{
+	// Do not move if the UI has a focused element (the console)
+	if (GetSubsystem<UI>()->GetFocusElement())
+		return;
+
+	Input* input = GetSubsystem<Input>();
+
+	// Movement speed as world units per second
+	const float MOVE_SPEED = 20.0f;
+	// Mouse sensitivity as degrees per pixel
+	const float MOUSE_SENSITIVITY = 0.1f;
+
+	// Use this frame's mouse motion to adjust camera node yaw and pitch. Clamp the pitch between -90 and 90 degrees
+	IntVector2 mouseMove = input->GetMouseMove();
+	yaw_ += MOUSE_SENSITIVITY * mouseMove.x_;
+	pitch_ += MOUSE_SENSITIVITY * mouseMove.y_;
+	pitch_ = Clamp(pitch_, -90.0f, 90.0f);
+
+	// Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
+	cameraNode_->SetRotation(Quaternion(pitch_, yaw_, 0.0f));
+
+	// Read WASD keys and move the camera scene node to the corresponding direction if they are pressed
+	// Use the TranslateRelative() function to move relative to the node's orientation. Alternatively we could
+	// multiply the desired direction with the node's orientation quaternion, and use just Translate()
+	if (input->GetKeyDown('W'))
+		cameraNode_->TranslateRelative(Vector3::FORWARD * MOVE_SPEED * timeStep);
+	if (input->GetKeyDown('S'))
+		cameraNode_->TranslateRelative(Vector3::BACK * MOVE_SPEED * timeStep);
+	if (input->GetKeyDown('A'))
+		cameraNode_->TranslateRelative(Vector3::LEFT * MOVE_SPEED * timeStep);
+	if (input->GetKeyDown('D'))
+		cameraNode_->TranslateRelative(Vector3::RIGHT * MOVE_SPEED * timeStep);
+}
+
 void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 {
-    // Do nothing for now, could be extended to eg. animate the display.
+	using namespace Update;
+
+	// Take the frame time step, which is stored as a float
+	float timeStep = eventData[P_TIMESTEP].GetFloat();
+
+	// Move the camera, scale movement with time step
+	MoveCamera(timeStep);
 }
 
 
