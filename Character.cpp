@@ -82,12 +82,12 @@ void Character::FixedUpdate(float timeStep)
     
     if (controls_.IsDown(CTRL_FORWARD))
         moveDir += Vector3::FORWARD;
-    if (controls_.IsDown(CTRL_BACK))
+    /*if (controls_.IsDown(CTRL_BACK))
         moveDir += Vector3::BACK;
     if (controls_.IsDown(CTRL_LEFT))
         moveDir += Vector3::LEFT;
     if (controls_.IsDown(CTRL_RIGHT))
-        moveDir += Vector3::RIGHT;
+        moveDir += Vector3::RIGHT;*/
     
     // Normalize move vector so that diagonal strafing is not faster
     if (moveDir.LengthSquared() > 0.0f)

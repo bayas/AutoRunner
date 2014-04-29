@@ -56,10 +56,11 @@
 DEFINE_APPLICATION_MAIN(AutoRunner)
 
 AutoRunner::AutoRunner(Context* context) :
-    Sample(context),
+	Sample(context),
 	touch_(new Touch(context)),
-    yaw_(0.0f),
-    pitch_(0.0f)
+	yaw_(0.0f),
+	pitch_(0.0f),
+	blockPos_(Vector3::ZERO)
 {
 	Character::RegisterObject(context);
 }
@@ -97,9 +98,6 @@ void AutoRunner::InitScene()
 	scene_ = new Scene(context_);
 	File loadFile(context_, fs->GetProgramDir() + "Data/Scenes/AutoRunner.xml", FILE_READ);
 	scene_->LoadXML(loadFile);
-
-	XMLFile* xml = cache->GetResource<XMLFile>("Objects/RoadBlock.xml");
-	Node* blockNode = scene_->InstantiateXML(xml->GetRoot(), Vector3(0, 0, 0), Quaternion::IDENTITY);
 
 	// Pass knowledge of the scene & camera node to the Touch helper object.
 	touch_->scene_ = scene_;
@@ -144,12 +142,16 @@ void AutoRunner::CreateCharacter()
 	// and keeps it alive as long as it's not removed from the hierarchy
 	character_ = objectNode->CreateComponent<Character>();
 
+	// Create first block.
+	XMLFile* xml = cache->GetResource<XMLFile>("Objects/RoadBlock.xml");
+	Node* blockNode = scene_->InstantiateXML(xml->GetRoot(), Vector3::ZERO, Quaternion::IDENTITY);
+	blocks_.Push(blockNode);
 }
 
 void AutoRunner::CreateCamera()
 {
 	cameraNode_ = new Node(context_);
-	cameraNode_->SetPosition(Vector3(0.0f, 5.0f, 0.0f));
+	cameraNode_->SetPosition(Vector3(0.0f, 3.0f, -5.0f));
 	Camera* camera = cameraNode_->CreateComponent<Camera>();
 	camera->SetFarClip(300.0f);
 
@@ -159,42 +161,10 @@ void AutoRunner::CreateCamera()
 void AutoRunner::SubscribeToEvents()
 {
     // Subscribe HandleUpdate() function for processing update events
-    SubscribeToEvent(E_UPDATE, HANDLER(AutoRunner, HandleUpdate));
-}
+	SubscribeToEvent(E_UPDATE, HANDLER(AutoRunner, HandleUpdate));
 
-void AutoRunner::MoveCamera(float timeStep)
-{
-	// Do not move if the UI has a focused element (the console)
-	if (GetSubsystem<UI>()->GetFocusElement())
-		return;
-
-	Input* input = GetSubsystem<Input>();
-
-	// Movement speed as world units per second
-	const float MOVE_SPEED = 20.0f;
-	// Mouse sensitivity as degrees per pixel
-	const float MOUSE_SENSITIVITY = 0.1f;
-
-	// Use this frame's mouse motion to adjust camera node yaw and pitch. Clamp the pitch between -90 and 90 degrees
-	IntVector2 mouseMove = input->GetMouseMove();
-	yaw_ += MOUSE_SENSITIVITY * mouseMove.x_;
-	pitch_ += MOUSE_SENSITIVITY * mouseMove.y_;
-	pitch_ = Clamp(pitch_, -90.0f, 90.0f);
-
-	// Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
-	cameraNode_->SetRotation(Quaternion(pitch_, yaw_, 0.0f));
-
-	// Read WASD keys and move the camera scene node to the corresponding direction if they are pressed
-	// Use the TranslateRelative() function to move relative to the node's orientation. Alternatively we could
-	// multiply the desired direction with the node's orientation quaternion, and use just Translate()
-	if (input->GetKeyDown('W'))
-		cameraNode_->TranslateRelative(Vector3::FORWARD * MOVE_SPEED * timeStep);
-	if (input->GetKeyDown('S'))
-		cameraNode_->TranslateRelative(Vector3::BACK * MOVE_SPEED * timeStep);
-	if (input->GetKeyDown('A'))
-		cameraNode_->TranslateRelative(Vector3::LEFT * MOVE_SPEED * timeStep);
-	if (input->GetKeyDown('D'))
-		cameraNode_->TranslateRelative(Vector3::RIGHT * MOVE_SPEED * timeStep);
+	// Subscribe to PostUpdate event for updating the camera position after physics simulation
+	SubscribeToEvent(E_POSTUPDATE, HANDLER(AutoRunner, HandlePostUpdate));
 }
 
 void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
@@ -204,12 +174,27 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 	float timeStep = eventData[P_TIMESTEP].GetFloat();
 	Input* input = GetSubsystem<Input>();
 
-	MoveCamera(timeStep);
-
 	if (character_)
 	{
+		// Create Incremental Blocks.
+		Vector3 worldPos = character_->GetNode()->GetWorldPosition();
+		if (blockPos_.z_ < worldPos.z_) {
+			blockPos_ += Vector3(0, 0, 2);
+
+			XMLFile* xml = GetSubsystem<ResourceCache>()->GetResource<XMLFile>("Objects/RoadBlock.xml");
+			Node* blockNode = scene_->InstantiateXML(xml->GetRoot(), blockPos_, Quaternion::IDENTITY);
+			blocks_.Push(blockNode);
+		}
+
+		// Remove unused blocks from block list.
+		if (blocks_.Size() > 3) {
+			Node* block = blocks_.Front();
+			block->Remove();
+			blocks_.PopFront();
+		}
+
 		// Clear previous controls
-		character_->controls_.Set(CTRL_FORWARD | CTRL_BACK | CTRL_LEFT | CTRL_RIGHT | CTRL_JUMP, false);
+		character_->controls_.Set(CTRL_FORWARD /*| CTRL_BACK | CTRL_LEFT | CTRL_RIGHT */| CTRL_JUMP, false);
 
 		if (touch_->touchEnabled_)
 		{
@@ -223,49 +208,58 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 
 			if (!ui->GetFocusElement())
 			{
-				character_->controls_.Set(CTRL_FORWARD, input->GetKeyDown('Y'));
-				character_->controls_.Set(CTRL_BACK, input->GetKeyDown('H'));
-				character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('G'));
-				character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('J'));
+				character_->controls_.Set(CTRL_FORWARD, input->GetKeyDown('W') || input->GetKeyDown(KEY_UP));
+				//character_->controls_.Set(CTRL_BACK, input->GetKeyDown('S'));
+				//character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('A'));
+				//character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('D'));
 				character_->controls_.Set(CTRL_JUMP, input->GetKeyDown(KEY_SPACE));
 
 				// Add character yaw & pitch from the mouse motion
-				character_->controls_.yaw_ += (float)input->GetMouseMoveX() * YAW_SENSITIVITY;
-				character_->controls_.pitch_ += (float)input->GetMouseMoveY() * YAW_SENSITIVITY;
+				yaw_ += (float)input->GetMouseMoveX() * YAW_SENSITIVITY;
+				pitch_ += (float)input->GetMouseMoveY() * YAW_SENSITIVITY;
 				// Limit pitch
-				character_->controls_.pitch_ = Clamp(character_->controls_.pitch_, -80.0f, 80.0f);
+				pitch_ = Clamp(pitch_, -80.0f, 80.0f);
 
 				// Switch between 1st and 3rd person
 				if (input->GetKeyPress('F'))
 					touch_->firstPerson_ = touch_->newFirstPerson_ = !touch_->firstPerson_;
-
-				// Check for loading / saving the scene
-				if (input->GetKeyPress(KEY_F5))
-				{
-					File saveFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/CharacterDemo.xml",
-						FILE_WRITE);
-					scene_->SaveXML(saveFile);
-				}
-				if (input->GetKeyPress(KEY_F7))
-				{
-					File loadFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/CharacterDemo.xml", FILE_READ);
-					scene_->LoadXML(loadFile);
-					// After loading we have to reacquire the weak pointer to the Character component, as it has been recreated
-					// Simply find the character's scene node by name as there's only one of them
-					Node* characterNode = scene_->GetChild("Jack", true);
-					if (characterNode)
-						character_ = characterNode->GetComponent<Character>();
-				}
 			}
 		}
-
-		// Set rotation already here so that it's updated every rendering frame instead of every physics frame
-		character_->GetNode()->SetRotation(Quaternion(character_->controls_.yaw_, Vector3::UP));
 	}
 }
 
-
 void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 {
+	if (!character_)
+		return;
 
+	Node* characterNode = character_->GetNode();
+
+	// Get camera lookat dir from character yaw + pitch
+	Quaternion rot = Quaternion(yaw_, Vector3::UP);
+	Quaternion dir = rot * Quaternion(pitch_, Vector3::RIGHT);
+
+	if (touch_->firstPerson_)
+	{
+		Node* headNode = characterNode->GetChild("Bip01_Head", true);
+		cameraNode_->SetPosition(headNode->GetWorldPosition() + rot * Vector3(0.0f, 0.15f, 0.2f));
+		cameraNode_->SetRotation(dir);
+	}
+	else
+	{
+		// Third person camera: position behind the character
+		Vector3 aimPoint = characterNode->GetPosition() + rot * Vector3(0.0f, 1.7f, 0.0f);
+
+		// Collide camera ray with static physics objects (layer bitmask 2) to ensure we see the character properly
+		Vector3 rayDir = dir * Vector3::BACK;
+		float rayDistance = touch_->cameraDistance_;
+		PhysicsRaycastResult result;
+		scene_->GetComponent<PhysicsWorld>()->RaycastSingle(result, Ray(aimPoint, rayDir), rayDistance, 2);
+		if (result.body_)
+			rayDistance = Min(rayDistance, result.distance_);
+		rayDistance = Clamp(rayDistance, CAMERA_MIN_DIST, CAMERA_MAX_DIST);
+
+		cameraNode_->SetPosition(aimPoint + rayDir * rayDistance);
+		cameraNode_->SetRotation(dir);
+	}
 }

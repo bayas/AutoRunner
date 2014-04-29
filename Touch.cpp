@@ -159,12 +159,12 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
                     int relY = touch->position_.y_ - moveButton_->GetScreenPosition().y_ - touchButtonSize_ / 2;
                     if (relY < 0 && Abs(relX * 3 / 2) < Abs(relY))
                         controls.Set(CTRL_FORWARD, true);
-                    if (relY > 0 && Abs(relX * 3 / 2) < Abs(relY))
+                    /*if (relY > 0 && Abs(relX * 3 / 2) < Abs(relY))
                         controls.Set(CTRL_BACK, true);
                     if (relX < 0 && Abs(relY * 3 / 2) < Abs(relX))
                         controls.Set(CTRL_LEFT, true);
                     if (relX > 0 && Abs(relY * 3 / 2) < Abs(relX))
-                        controls.Set(CTRL_RIGHT, true);
+                        controls.Set(CTRL_RIGHT, true);*/
                 }
             }
         }
@@ -178,15 +178,15 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
     {
         JoystickState* joystick = input->GetJoystick(0);
         if (joystick->GetNumAxes() >= 2)
-        {
-            if (joystick->GetAxisPosition(0) < -GYROSCOPE_THRESHOLD)
+		{
+			if (joystick->GetAxisPosition(1) < -GYROSCOPE_THRESHOLD)
+				controls.Set(CTRL_FORWARD, true);
+            /*if (joystick->GetAxisPosition(0) < -GYROSCOPE_THRESHOLD)
                 controls.Set(CTRL_LEFT, true);
             if (joystick->GetAxisPosition(0) > GYROSCOPE_THRESHOLD)
                 controls.Set(CTRL_RIGHT, true);
-            if (joystick->GetAxisPosition(1) < -GYROSCOPE_THRESHOLD)
-                controls.Set(CTRL_FORWARD, true);
             if (joystick->GetAxisPosition(1) > GYROSCOPE_THRESHOLD)
-                controls.Set(CTRL_BACK, true);
+                controls.Set(CTRL_BACK, true);*/
         }
     }
 }

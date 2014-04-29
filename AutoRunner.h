@@ -53,8 +53,6 @@ private:
 	void CreateCamera();
 	/// Subscribe to necessary events.
 	void SubscribeToEvents();
-	/// Read input and moves the camera.
-	void MoveCamera(float timeStep);
 	/// Handle application update. Set controls to character.
 	void HandleUpdate(StringHash eventType, VariantMap& eventData);
 	/// Handle application post-update. Update camera position after character has moved.
@@ -72,4 +70,8 @@ private:
 	float yaw_;
 	/// Camera pitch angle.
 	float pitch_;
+
+	/// Game mechanics.
+	Vector3 blockPos_;
+	List<Node*> blocks_;
 };
