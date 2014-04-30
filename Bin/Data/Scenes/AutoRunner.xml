@@ -3,25 +3,37 @@
 	<attribute name="Name" value="" />
 	<attribute name="Time Scale" value="1" />
 	<attribute name="Smoothing Constant" value="50" />
-	<attribute name="Snap Threshold" value="5" />
-	<attribute name="Elapsed Time" value="6.98774" />
-	<attribute name="Next Replicated Node ID" value="13" />
-	<attribute name="Next Replicated Component ID" value="26" />
-	<attribute name="Next Local Node ID" value="16777288" />
-	<attribute name="Next Local Component ID" value="16777221" />
+	<attribute name="Snap Threshold" value="500" />
+	<attribute name="Elapsed Time" value="0" />
+	<attribute name="Next Replicated Node ID" value="39" />
+	<attribute name="Next Replicated Component ID" value="113" />
+	<attribute name="Next Local Node ID" value="16777235" />
+	<attribute name="Next Local Component ID" value="16777219" />
 	<attribute name="Variables" />
-	<attribute name="Variable Names" value="" />
+	<attribute name="Variable Names" value="Offset" />
 	<component type="Octree" id="1" />
 	<component type="PhysicsWorld" id="2" />
 	<component type="DebugRenderer" id="3" />
 	<node id="16777216">
 		<attribute name="Is Enabled" value="true" />
-		<attribute name="Name" value="Sun" />
-		<attribute name="Position" value="5.99136 12.0765 -9.50788" />
-		<attribute name="Rotation" value="0.931299 0.364247 0.00235868 0.000922524" />
+		<attribute name="Name" value="Sun1" />
+		<attribute name="Position" value="8.01649 -0.771452 11.3866" />
+		<attribute name="Rotation" value="0.910738 0.193874 -0.353211 0.0906086" />
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
 		<component type="Light" id="16777216">
+			<attribute name="Light Type" value="Directional" />
+			<attribute name="Range" value="100" />
+		</component>
+	</node>
+	<node id="16777217">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Sun2" />
+		<attribute name="Position" value="8.01649 -0.771452 -5.58771" />
+		<attribute name="Rotation" value="0.524827 0.753671 0.267691 0.291336" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<component type="Light" id="16777217">
 			<attribute name="Light Type" value="Directional" />
 			<attribute name="Range" value="100" />
 		</component>

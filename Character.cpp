@@ -34,7 +34,8 @@ Character::Character(Context* context) :
     LogicComponent(context),
     onGround_(false),
     okToJump_(true),
-    inAirTimer_(0.0f)
+    inAirTimer_(0.0f),
+	score_(0)
 {
     // Only the physics update event is needed: unsubscribe from the rest for optimization
     SetUpdateEventMask(USE_FIXEDUPDATE);
@@ -81,13 +82,13 @@ void Character::FixedUpdate(float timeStep)
     Vector3 planeVelocity(velocity.x_, 0.0f, velocity.z_);
     
     if (controls_.IsDown(CTRL_FORWARD))
-        moveDir += Vector3::FORWARD;
+		moveDir += Vector3::FORWARD;
+	if (controls_.IsDown(CTRL_LEFT))
+		moveDir += Vector3::LEFT;
+	if (controls_.IsDown(CTRL_RIGHT))
+		moveDir += Vector3::RIGHT;
     /*if (controls_.IsDown(CTRL_BACK))
-        moveDir += Vector3::BACK;
-    if (controls_.IsDown(CTRL_LEFT))
-        moveDir += Vector3::LEFT;
-    if (controls_.IsDown(CTRL_RIGHT))
-        moveDir += Vector3::RIGHT;*/
+        moveDir += Vector3::BACK;*/
     
     // Normalize move vector so that diagonal strafing is not faster
     if (moveDir.LengthSquared() > 0.0f)
@@ -121,7 +122,7 @@ void Character::FixedUpdate(float timeStep)
     else
         animCtrl->Stop("Models/Jack_Walk.ani", 0.2f);
     // Set walk animation speed proportional to velocity
-    animCtrl->SetSpeed("Models/Jack_Walk.ani", planeVelocity.Length() * 0.3f);
+    animCtrl->SetSpeed("Models/Jack_Walk.ani", planeVelocity.Length() * .8f);
     
     // Reset grounded flag for next frame
     onGround_ = false;
@@ -133,7 +134,16 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
     using namespace NodeCollision;
     
     MemoryBuffer contacts(eventData[P_CONTACTS].GetBuffer());
-    
+	
+	// Check coins
+	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
+	String otherName = otherNode->GetName();
+	Variant pnt = otherNode->GetVar("Point");
+	if (pnt != Variant::EMPTY) {
+		score_ += pnt.GetInt();
+		otherNode->Remove();
+	}
+
     while (!contacts.IsEof())
     {
         Vector3 contactPosition = contacts.ReadVector3();

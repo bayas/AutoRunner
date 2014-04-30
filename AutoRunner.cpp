@@ -60,7 +60,7 @@ AutoRunner::AutoRunner(Context* context) :
 	touch_(new Touch(context)),
 	yaw_(0.0f),
 	pitch_(0.0f),
-	blockPos_(Vector3::ZERO)
+	scoreText_(0)
 {
 	Character::RegisterObject(context);
 }
@@ -78,6 +78,9 @@ void AutoRunner::Start()
 
 	// Create the controllable character
 	CreateCharacter();
+
+	// Create overlays
+	CreateOverlays();
 
 	// Subscribe to necessary events
 	SubscribeToEvents();
@@ -143,8 +146,16 @@ void AutoRunner::CreateCharacter()
 	character_ = objectNode->CreateComponent<Character>();
 
 	// Create first block.
-	XMLFile* xml = cache->GetResource<XMLFile>("Objects/RoadBlock.xml");
-	Node* blockNode = scene_->InstantiateXML(xml->GetRoot(), Vector3::ZERO, Quaternion::IDENTITY);
+	Node* blockNode = scene_->CreateChild("RoadBlock");
+	blockNode->SetScale(Vector3(6.0f, 1.0f, 2.0f));
+	StaticModel* planeObject = blockNode->CreateComponent<StaticModel>();
+	planeObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+	planeObject->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));
+	blockNode->CreateComponent<RigidBody>();
+	CollisionShape* blockShape = blockNode->CreateComponent<CollisionShape>();
+	// Set a box shape of size 1 x 1 x 1 for collision. The shape will be scaled with the scene node scale, so the
+	// rendering and physics representation sizes should match (the box model is also 1 x 1 x 1.)
+	blockShape->SetBox(Vector3::ONE);
 	blocks_.Push(blockNode);
 }
 
@@ -156,6 +167,21 @@ void AutoRunner::CreateCamera()
 	camera->SetFarClip(300.0f);
 
 	GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
+}
+
+void AutoRunner::CreateOverlays()
+{
+	ResourceCache* cache = GetSubsystem<ResourceCache>();
+	UI* ui = GetSubsystem<UI>();
+
+	// Construct new Text object, set string to display and font to use
+	scoreText_ = ui->GetRoot()->CreateChild<Text>();
+	scoreText_->SetText("Score 0");
+	scoreText_->SetFont(cache->GetResource<Font>("Fonts/BlueHighway.ttf"), 17);
+	scoreText_->SetPosition(5, 5);
+	scoreText_->SetAlignment(HA_LEFT, VA_TOP);
+	scoreText_->SetColor(C_BOTTOMLEFT, Color(1, 1, 0.25));
+	scoreText_->SetColor(C_BOTTOMRIGHT, Color(1, 1, 0.25));
 }
 
 void AutoRunner::SubscribeToEvents()
@@ -173,28 +199,70 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 
 	float timeStep = eventData[P_TIMESTEP].GetFloat();
 	Input* input = GetSubsystem<Input>();
+	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
 	if (character_)
 	{
 		// Create Incremental Blocks.
 		Vector3 worldPos = character_->GetNode()->GetWorldPosition();
-		if (blockPos_.z_ < worldPos.z_) {
-			blockPos_ += Vector3(0, 0, 2);
+		Node* lastRoadBlock = blocks_.Back();
+		Vector3 blockPos = lastRoadBlock->GetWorldPosition();
+		Vector3 target = blockPos - worldPos;
+		if (target.Length() < 2) {
+			int randNumber = Rand();
+			String fileName = String::EMPTY;
 
-			XMLFile* xml = GetSubsystem<ResourceCache>()->GetResource<XMLFile>("Objects/RoadBlock.xml");
-			Node* blockNode = scene_->InstantiateXML(xml->GetRoot(), blockPos_, Quaternion::IDENTITY);
-			blocks_.Push(blockNode);
+			if (1/*randNumber % 2 == 0*/) { // straight road block
+				fileName = "Objects/RoadBlock1.xml";
+				blockPos += Vector3(0, 0, 100);
+			} else if (randNumber % 3 == 0) {// cornered road block
+				fileName = "Objects/RoadBlock1.xml";
+				blockPos += Vector3(0, 0, 90);
+			} else { // sloped road block
+				fileName = "Objects/RoadBlock3.xml";
+				blockPos += Vector3(0, 0, 89);
+			}
+
+			SharedPtr<File> fBlock1 = cache->GetFile(fileName);
+			Node* blockNode = scene_->InstantiateXML(*fBlock1, blockPos, Quaternion::IDENTITY);
+			if (blockNode)
+				blocks_.Push(blockNode);
+
+			// Create coins
+			PODVector<Node*> allBlocks;
+			blockNode->GetChildren(allBlocks, true);
+			for (auto it = allBlocks.Begin(); it != allBlocks.End(); ++it) {
+				Node* floorNode = *it;
+				if (floorNode->GetName() == "Floor") {
+					Vector3 pos = floorNode->GetWorldPosition();
+					XMLFile* cbXML = cache->GetResource<XMLFile>("Objects/CoinBlue.xml");
+					XMLFile* crXML = cache->GetResource<XMLFile>("Objects/CoinRed.xml");
+					XMLFile* cgXML = cache->GetResource<XMLFile>("Objects/CoinGold.xml");
+					if (cbXML) {
+						scene_->InstantiateXML(cbXML->GetRoot(), pos + Vector3(-1, 1, -1), Quaternion::IDENTITY);
+						scene_->InstantiateXML(cbXML->GetRoot(), pos + Vector3(-1, 1, -3), Quaternion::IDENTITY);
+						scene_->InstantiateXML(cbXML->GetRoot(), pos + Vector3(-1, 1, -5), Quaternion::IDENTITY);
+					}
+
+					if (crXML) {
+						scene_->InstantiateXML(crXML->GetRoot(), pos + Vector3(1, 1, 7), Quaternion::IDENTITY);
+						scene_->InstantiateXML(cgXML->GetRoot(), pos + Vector3(1, 1, 10), Quaternion::IDENTITY);
+						scene_->InstantiateXML(crXML->GetRoot(), pos + Vector3(1, 1, 13), Quaternion::IDENTITY);
+					}
+				}
+			}
+
 		}
 
 		// Remove unused blocks from block list.
-		if (blocks_.Size() > 3) {
+		if (blocks_.Size() > 2) {
 			Node* block = blocks_.Front();
 			block->Remove();
 			blocks_.PopFront();
 		}
 
 		// Clear previous controls
-		character_->controls_.Set(CTRL_FORWARD /*| CTRL_BACK | CTRL_LEFT | CTRL_RIGHT */| CTRL_JUMP, false);
+		character_->controls_.Set(CTRL_FORWARD | CTRL_LEFT | CTRL_RIGHT /*| CTRL_BACK */| CTRL_JUMP, false);
 
 		if (touch_->touchEnabled_)
 		{
@@ -208,10 +276,14 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 
 			if (!ui->GetFocusElement())
 			{
-				character_->controls_.Set(CTRL_FORWARD, input->GetKeyDown('W') || input->GetKeyDown(KEY_UP));
+				static bool starting = false;
+				if (input->GetKeyDown('W') || input->GetKeyDown(KEY_UP))
+					starting = true;
+
+				character_->controls_.Set(CTRL_FORWARD, starting);
+				character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('A'));
+				character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('D'));
 				//character_->controls_.Set(CTRL_BACK, input->GetKeyDown('S'));
-				//character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('A'));
-				//character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('D'));
 				character_->controls_.Set(CTRL_JUMP, input->GetKeyDown(KEY_SPACE));
 
 				// Add character yaw & pitch from the mouse motion
@@ -232,6 +304,10 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 {
 	if (!character_)
 		return;
+
+	// Update score
+	if (scoreText_)
+		scoreText_->SetText("Score " + (String)character_->GetScore());
 
 	Node* characterNode = character_->GetNode();
 

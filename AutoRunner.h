@@ -51,6 +51,8 @@ private:
 	void CreateCharacter();
 	/// Create camera.
 	void CreateCamera();
+	/// Create overlays.
+	void CreateOverlays();
 	/// Subscribe to necessary events.
 	void SubscribeToEvents();
 	/// Handle application update. Set controls to character.
@@ -72,6 +74,6 @@ private:
 	float pitch_;
 
 	/// Game mechanics.
-	Vector3 blockPos_;
 	List<Node*> blocks_;
+	Text* scoreText_;
 };

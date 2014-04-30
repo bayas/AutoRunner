@@ -29,11 +29,11 @@ using namespace Urho3D;
 
 const int CTRL_FORWARD = 1;
 //const int CTRL_BACK = 2;
-//const int CTRL_LEFT = 4;
-//const int CTRL_RIGHT = 8;
+const int CTRL_LEFT = 4;
+const int CTRL_RIGHT = 8;
 const int CTRL_JUMP = 16;
 
-const float MOVE_FORCE = 0.8f;
+const float MOVE_FORCE = 1.8f;
 const float INAIR_MOVE_FORCE = 0.02f;
 const float BRAKE_FORCE = 0.2f;
 const float JUMP_FORCE = 7.0f;
@@ -59,7 +59,9 @@ public:
     
     /// Movement controls. Assigned by the main program each frame.
     Controls controls_;
-    
+
+	int GetScore() { return score_; }
+
 private:
     /// Handle physics collision event.
     void HandleNodeCollision(StringHash eventType, VariantMap& eventData);
@@ -70,4 +72,7 @@ private:
     bool okToJump_;
     /// In air timer. Due to possible physics inaccuracy, character can be off ground for max. 1/10 second and still be allowed to move.
     float inAirTimer_;
+
+	/// Game mechanics.
+	int score_;
 };
