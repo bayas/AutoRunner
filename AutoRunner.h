@@ -55,10 +55,14 @@ private:
 	void CreateOverlays();
 	/// Subscribe to necessary events.
 	void SubscribeToEvents();
+	/// Handle application fixed-update. Update character path.
+	void HandleFixedUpdate(StringHash eventType, VariantMap& eventData);
 	/// Handle application update. Set controls to character.
 	void HandleUpdate(StringHash eventType, VariantMap& eventData);
 	/// Handle application post-update. Update camera position after character has moved.
 	void HandlePostUpdate(StringHash eventType, VariantMap& eventData);
+	/// Handle the post-render update event.
+	void HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData);
 
 	/// Scene.
 	SharedPtr<Scene> scene_;
@@ -72,8 +76,14 @@ private:
 	float yaw_;
 	/// Camera pitch angle.
 	float pitch_;
+	/// Flag for drawing debug geometry.
+	bool drawDebug_;
 
 	/// Game mechanics.
+	void CreateInitialLevel();
+	void UpdatePath(bool startIn = true);
+
 	List<Node*> blocks_;
 	Text* scoreText_;
+	Node* characterHead_;
 };

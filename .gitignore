@@ -10,6 +10,8 @@
 *.user
 *.sln.docstates
 *.exe
+*.ps3
+*.vs3
 
 # Build results
 

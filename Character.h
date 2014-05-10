@@ -24,6 +24,7 @@
 
 #include "Controls.h"
 #include "LogicComponent.h"
+#include "List.h"
 
 using namespace Urho3D;
 
@@ -33,12 +34,21 @@ const int CTRL_LEFT = 4;
 const int CTRL_RIGHT = 8;
 const int CTRL_JUMP = 16;
 
-const float MOVE_FORCE = 1.8f;
+const float MOVE_FORCE = 1.2f;
+const float MOVE_SIDE_FORCE = 13.0f;
 const float INAIR_MOVE_FORCE = 0.02f;
 const float BRAKE_FORCE = 0.2f;
 const float JUMP_FORCE = 7.0f;
 const float YAW_SENSITIVITY = 0.1f;
 const float INAIR_THRESHOLD_TIME = 0.1f;
+
+enum CharacterSide {
+	LEFT_SIDE = 0,
+	RIGHT_SIDE,
+	CENTER_SIDE
+};
+
+typedef HashMap<unsigned int, List<Vector3>> RunPath;
 
 /// Character component, responsible for physical movement according to controls, as well as animation.
 class Character : public LogicComponent
@@ -55,12 +65,18 @@ public:
     /// Handle startup. Called by LogicComponent base class. Creates model and loads animations.
     virtual void Start();
     /// Handle physics world update. Called by LogicComponent base class.
-    virtual void FixedUpdate(float timeStep);
-    
+	virtual void FixedUpdate(float timeStep);
+
     /// Movement controls. Assigned by the main program each frame.
     Controls controls_;
 
 	int GetScore() { return score_; }
+	CharacterSide GetSide() { return currentSide_; }
+	void AddToPath(CharacterSide side, const List<Vector3>& points);
+	bool GetCurrentPoint(Vector3& point);
+	void RemoveFirstPoint();
+	unsigned int GetNumPoints() { return runPath_[currentSide_].Size(); }
+	void FollowPath(float timeStep);
 
 private:
     /// Handle physics collision event.
@@ -74,5 +90,10 @@ private:
     float inAirTimer_;
 
 	/// Game mechanics.
+	bool CheckSide(int control);
+
 	int score_;
+	CharacterSide currentSide_;
+	RunPath runPath_;
+
 };

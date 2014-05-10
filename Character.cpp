@@ -29,13 +29,16 @@
 #include "RigidBody.h"
 #include "Scene.h"
 #include "SceneEvents.h"
+#include "Log.h"
+#include "SmoothedTransform.h"
 
 Character::Character(Context* context) :
     LogicComponent(context),
     onGround_(false),
     okToJump_(true),
     inAirTimer_(0.0f),
-	score_(0)
+	score_(0),
+	currentSide_(CharacterSide::CENTER_SIDE)
 {
     // Only the physics update event is needed: unsubscribe from the rest for optimization
     SetUpdateEventMask(USE_FIXEDUPDATE);
@@ -60,8 +63,15 @@ void Character::Start()
     SubscribeToEvent(GetNode(), E_NODECOLLISION, HANDLER(Character, HandleNodeCollision));
 }
 
+float coolDown = 0.0f;
+int cntLeft = 0;
+int cntRight = 0;
+
 void Character::FixedUpdate(float timeStep)
 {
+	if (coolDown > 0)
+		coolDown -= timeStep;
+
     /// \todo Could cache the components for faster access instead of finding them each frame
     RigidBody* body = GetComponent<RigidBody>();
     AnimationController* animCtrl = GetComponent<AnimationController>();
@@ -80,29 +90,60 @@ void Character::FixedUpdate(float timeStep)
     const Vector3& velocity = body->GetLinearVelocity();
     // Velocity on the XZ plane
     Vector3 planeVelocity(velocity.x_, 0.0f, velocity.z_);
-    
-    if (controls_.IsDown(CTRL_FORWARD))
-		moveDir += Vector3::FORWARD;
+
+	if (controls_.IsDown(CTRL_FORWARD))
+	{
+		moveDir = Vector3::FORWARD;
+		body->ApplyImpulse(rot * moveDir * (softGrounded ? MOVE_FORCE : INAIR_MOVE_FORCE));
+	}
+
 	if (controls_.IsDown(CTRL_LEFT))
-		moveDir += Vector3::LEFT;
+	{
+		cntLeft++;
+		if (coolDown <= 0 && onGround_)
+			coolDown = .3f;
+	}
+
 	if (controls_.IsDown(CTRL_RIGHT))
-		moveDir += Vector3::RIGHT;
-    /*if (controls_.IsDown(CTRL_BACK))
-        moveDir += Vector3::BACK;*/
-    
-    // Normalize move vector so that diagonal strafing is not faster
-    if (moveDir.LengthSquared() > 0.0f)
-        moveDir.Normalize();
-    
-    // If in air, allow control, but slower than when on ground
-    body->ApplyImpulse(rot * moveDir * (softGrounded ? MOVE_FORCE : INAIR_MOVE_FORCE));
-    
+	{
+		cntRight++;
+		if (coolDown <= 0 && onGround_)
+			coolDown = .3f;
+	}
+
+	if (coolDown <= 0 && !controls_.IsDown(CTRL_LEFT))
+		cntLeft = 0;
+	if (coolDown <= 0 && !controls_.IsDown(CTRL_RIGHT))
+		cntRight = 0;
+
+	if (cntLeft > 1)
+		LOGDEBUG("cntLeft: " + (String)cntLeft);
+	if (cntRight > 1)
+		LOGDEBUG("cntRight: " + (String)cntRight);
+
+	//LOGDEBUG("Character Position: " + node_->GetWorldPosition().ToString());
+
+	if (coolDown == .3f)
+	{
+		if (controls_.IsDown(CTRL_LEFT) && CheckSide(CTRL_LEFT))
+		{
+			moveDir = Vector3::LEFT;
+			body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
+		}
+
+		if (controls_.IsDown(CTRL_RIGHT) && CheckSide(CTRL_RIGHT))
+		{
+			moveDir = Vector3::RIGHT;
+			body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
+		}
+	}
+
     if (softGrounded)
     {
         // When on ground, apply a braking force to limit maximum ground velocity
-        Vector3 brakeForce = -planeVelocity * BRAKE_FORCE;
-        body->ApplyImpulse(brakeForce);
-        
+		Vector3 brakeForce = -planeVelocity * BRAKE_FORCE;
+		body->ApplyImpulse(brakeForce);
+
         // Jump. Must release jump control inbetween jumps
         if (controls_.IsDown(CTRL_JUMP))
         {
@@ -135,7 +176,7 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
     
     MemoryBuffer contacts(eventData[P_CONTACTS].GetBuffer());
 	
-	// Check coins
+	// Get coin points
 	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
 	String otherName = otherNode->GetName();
 	Variant pnt = otherNode->GetVar("Point");
@@ -159,4 +200,84 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
                 onGround_ = true;
         }
     }
+}
+
+bool Character::CheckSide(int control)
+{
+	switch (control)
+	{
+	case CTRL_LEFT:
+		{
+			switch (currentSide_)
+			{
+			case LEFT_SIDE:
+				return false;
+			case RIGHT_SIDE:
+				currentSide_ = CENTER_SIDE;
+				break;
+			case CENTER_SIDE:
+				currentSide_ = LEFT_SIDE;
+				break;
+			}
+		}
+		break;
+	case CTRL_RIGHT:
+		{
+			switch (currentSide_)
+			{
+			case LEFT_SIDE:
+				currentSide_ = CENTER_SIDE;
+				break;
+			case RIGHT_SIDE:
+				return false;
+			case CENTER_SIDE:
+				currentSide_ = RIGHT_SIDE;
+				break;
+			}
+		}
+		break;
+	default:
+		return false;
+	}
+
+	return true;
+}
+
+void Character::AddToPath(CharacterSide side, const List<Vector3>& points)
+{
+	auto it = runPath_.Find(side);
+	if (it == runPath_.End())
+		runPath_[side] = points;
+	else
+		it->second_.Insert(it->second_.End(), points);
+}
+
+bool Character::GetCurrentPoint(Vector3& point)
+{
+	auto it = runPath_.Find((unsigned int)currentSide_);
+	if (it->second_.Size() == 0)
+		return false;
+
+	point = it->second_.Front();
+	return true;
+}
+
+void Character::RemoveFirstPoint()
+{
+	runPath_[currentSide_].PopFront();
+}
+
+void Character::FollowPath(float timeStep)
+{
+	Vector3 nextWaypoint = Vector3::ZERO; 
+	if (GetCurrentPoint(nextWaypoint)) {
+		nextWaypoint.y_ = node_->GetWorldPosition().y_;
+		Quaternion targetRotation;
+		targetRotation.FromLookRotation(nextWaypoint - node_->GetWorldPosition());
+		SmoothedTransform* smooth = node_->GetComponent<SmoothedTransform>();
+		LOGDEBUG("Target Rotation has NAN value: " + String(targetRotation.IsNaN() ? "TRUE" : "FALSE"));
+		if (!targetRotation.IsNaN())
+			smooth->SetTargetWorldRotation(targetRotation);
+		//node_->LookAt(nextWaypoint);
+	}
 }

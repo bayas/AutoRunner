@@ -50,6 +50,8 @@
 #include "AutoRunner.h"
 
 #include "XMLFile.h"
+#include "PhysicsEvents.h"
+#include "SmoothedTransform.h"
 #include "DebugNew.h"
 
 // Expands to this example's entry-point
@@ -60,6 +62,7 @@ AutoRunner::AutoRunner(Context* context) :
 	touch_(new Touch(context)),
 	yaw_(0.0f),
 	pitch_(0.0f),
+	drawDebug_(false),
 	scoreText_(0)
 {
 	Character::RegisterObject(context);
@@ -101,6 +104,7 @@ void AutoRunner::InitScene()
 	scene_ = new Scene(context_);
 	File loadFile(context_, fs->GetProgramDir() + "Data/Scenes/AutoRunner.xml", FILE_READ);
 	scene_->LoadXML(loadFile);
+	CreateInitialLevel();
 
 	// Pass knowledge of the scene & camera node to the Touch helper object.
 	touch_->scene_ = scene_;
@@ -111,8 +115,9 @@ void AutoRunner::CreateCharacter()
 {
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
+	String headName = "Bip01_Head";
 	Node* objectNode = scene_->CreateChild("Jack");
-	objectNode->SetPosition(Vector3(0.0f, 3.0f, 0.0f));
+	objectNode->SetPosition(Vector3(0.0f, 3.0f, -9.0f));
 
 	// Create the rendering component + animation controller
 	AnimatedModel* object = objectNode->CreateComponent<AnimatedModel>();
@@ -122,11 +127,12 @@ void AutoRunner::CreateCharacter()
 	objectNode->CreateComponent<AnimationController>();
 
 	// Set the head bone for manual control
-	object->GetSkeleton().GetBone("Bip01_Head")->animated_ = false;
+	object->GetSkeleton().GetBone(headName)->animated_ = false;
 
 	// Create rigidbody, and set non-zero mass so that the body becomes dynamic
 	RigidBody* body = objectNode->CreateComponent<RigidBody>();
 	body->SetCollisionLayer(1);
+	//body->SetKinematic(true);
 	body->SetMass(1.0f);
 
 	// Set zero angular factor so that physics doesn't turn the character on its own.
@@ -144,19 +150,14 @@ void AutoRunner::CreateCharacter()
 	// Remember it so that we can set the controls. Use a WeakPtr because the scene hierarchy already owns it
 	// and keeps it alive as long as it's not removed from the hierarchy
 	character_ = objectNode->CreateComponent<Character>();
+	// Set the head of this character body.
+	characterHead_ = objectNode->GetChild(headName, true);
 
-	// Create first block.
-	Node* blockNode = scene_->CreateChild("RoadBlock");
-	blockNode->SetScale(Vector3(6.0f, 1.0f, 2.0f));
-	StaticModel* planeObject = blockNode->CreateComponent<StaticModel>();
-	planeObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-	planeObject->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));
-	blockNode->CreateComponent<RigidBody>();
-	CollisionShape* blockShape = blockNode->CreateComponent<CollisionShape>();
-	// Set a box shape of size 1 x 1 x 1 for collision. The shape will be scaled with the scene node scale, so the
-	// rendering and physics representation sizes should match (the box model is also 1 x 1 x 1.)
-	blockShape->SetBox(Vector3::ONE);
-	blocks_.Push(blockNode);
+	// Add smoothed transform component.
+	objectNode->CreateComponent<SmoothedTransform>();
+
+	// Update first path.
+	UpdatePath();
 }
 
 void AutoRunner::CreateCamera()
@@ -186,11 +187,23 @@ void AutoRunner::CreateOverlays()
 
 void AutoRunner::SubscribeToEvents()
 {
-    // Subscribe HandleUpdate() function for processing update events
+	// Subscribe to FixedUpdate event for updating the character path
+	SubscribeToEvent(E_PHYSICSPRESTEP, HANDLER(AutoRunner, HandleFixedUpdate));
+
+	// Subscribe HandleUpdate() function for processing update events
 	SubscribeToEvent(E_UPDATE, HANDLER(AutoRunner, HandleUpdate));
 
 	// Subscribe to PostUpdate event for updating the camera position after physics simulation
 	SubscribeToEvent(E_POSTUPDATE, HANDLER(AutoRunner, HandlePostUpdate));
+
+	// Subscribe HandlePostRenderUpdate() function for processing the post-render update event, during which we request debug geometry
+	SubscribeToEvent(E_POSTRENDERUPDATE, HANDLER(AutoRunner, HandlePostRenderUpdate));
+}
+
+void AutoRunner::HandleFixedUpdate(StringHash eventType, VariantMap& eventData)
+{
+	using namespace PhysicsPreStep;
+
 }
 
 void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
@@ -203,18 +216,40 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 
 	if (character_)
 	{
+		Vector3 currentPoint;
+		if (character_->GetCurrentPoint(currentPoint)) {
+			Vector3 worldPos = character_->GetNode()->GetWorldPosition();
+			currentPoint.y_ = worldPos.y_;
+			float length = (worldPos - currentPoint).Length();
+			if (length <= 0.1f)
+				character_->RemoveFirstPoint();
+		}
+
+		// Update path.
+		Vector3 point;
+		if (character_->GetNumPoints() <= 1) {
+			auto it = blocks_.Front();
+			int outs = it->GetVar("Out").GetInt();
+			if (outs == 0)
+				blocks_.PopFront();
+
+			UpdatePath(false);
+		}
+
+		character_->FollowPath(timeStep);
+
 		// Create Incremental Blocks.
-		Vector3 worldPos = character_->GetNode()->GetWorldPosition();
+		/*Vector3 worldPos = character_->GetNode()->GetWorldPosition();
 		Node* lastRoadBlock = blocks_.Back();
-		Vector3 blockPos = lastRoadBlock->GetWorldPosition();
+		Vector3 tailPos = lastRoadBlock->GetWorldPosition();
 		Vector3 target = blockPos - worldPos;
-		if (target.Length() < 2) {
+		if (target.Length() < 3) {
 			int randNumber = Rand();
 			String fileName = String::EMPTY;
 
-			if (1/*randNumber % 2 == 0*/) { // straight road block
-				fileName = "Objects/RoadBlock1.xml";
-				blockPos += Vector3(0, 0, 100);
+			if (1/ *randNumber % 2 == 0* /) { // straight road block
+				fileName = "Objects/Block1.xml";
+				blockPos += Vector3(0, 0, 20);
 			} else if (randNumber % 3 == 0) {// cornered road block
 				fileName = "Objects/RoadBlock1.xml";
 				blockPos += Vector3(0, 0, 90);
@@ -259,7 +294,7 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 			Node* block = blocks_.Front();
 			block->Remove();
 			blocks_.PopFront();
-		}
+		}*/
 
 		// Clear previous controls
 		character_->controls_.Set(CTRL_FORWARD | CTRL_LEFT | CTRL_RIGHT /*| CTRL_BACK */| CTRL_JUMP, false);
@@ -298,6 +333,10 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 			}
 		}
 	}
+
+	// Toggle debug geometry with space
+	if (input->GetKeyPress(KEY_F3))
+		drawDebug_ = !drawDebug_;
 }
 
 void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
@@ -310,15 +349,22 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 		scoreText_->SetText("Score " + (String)character_->GetScore());
 
 	Node* characterNode = character_->GetNode();
-
 	// Get camera lookat dir from character yaw + pitch
 	Quaternion rot = Quaternion(yaw_, Vector3::UP);
 	Quaternion dir = rot * Quaternion(pitch_, Vector3::RIGHT);
 
+	// Turn head to camera pitch, but limit to avoid unnatural animation.
+	/*Vector3 headWorldTarget; 
+	if (character_->GetCurrentPoint(headWorldTarget)) {
+		headWorldTarget.y_ = characterHead_->GetWorldPosition().y_;
+		characterHead_->LookAt(headWorldTarget, Vector3(0.0f, 1.0f, 0.0f));
+		// Correct head orientation because LookAt assumes Z = forward, but the bone has been authored differently (Y = forward)
+		characterHead_->Rotate(Quaternion(0.0f, 90.0f, 90.0f));
+	}*/
+
 	if (touch_->firstPerson_)
 	{
-		Node* headNode = characterNode->GetChild("Bip01_Head", true);
-		cameraNode_->SetPosition(headNode->GetWorldPosition() + rot * Vector3(0.0f, 0.15f, 0.2f));
+		cameraNode_->SetPosition(characterHead_->GetWorldPosition() + rot * Vector3(0.0f, 0.15f, 0.2f));
 		cameraNode_->SetRotation(dir);
 	}
 	else
@@ -338,4 +384,177 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 		cameraNode_->SetPosition(aimPoint + rayDir * rayDistance);
 		cameraNode_->SetRotation(dir);
 	}
+}
+
+void AutoRunner::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
+{
+	// If draw debug mode is enabled, draw viewport debug geometry. Disable depth test so that we can see the effect of occlusion
+	if (drawDebug_)
+		GetSubsystem<Renderer>()->DrawDebugGeometry(false);
+}
+
+void AutoRunner::CreateInitialLevel()
+{
+	int cnt = 15;
+	int maxBlockNumber = 4;
+	ResourceCache* cache = GetSubsystem<ResourceCache>();
+	SetRandomSeed(443);
+
+	while (cnt > 0) {
+		bool attached = false;
+		Vector3 blockPos = Vector3::ZERO;
+		Quaternion blockRot = Quaternion(90, Vector3(0, 1, 0));
+
+		if (blocks_.Size() > 0) {
+			// Get last block from array.
+			Node* lastBlock = blocks_.Back();
+			// Get Out variables.
+			int outs = lastBlock->GetVar("Out").GetInt();
+			// Get Out's node.
+			Node* outNode = lastBlock->GetChild("Out");
+			blockPos = outNode->GetWorldPosition();
+			blockRot = outNode->GetWorldRotation();
+			attached = true;
+		}
+
+		// Initial transform has been given from out node.
+		int rnd = (Rand() % maxBlockNumber) + 1;
+		String prefabName = "Objects/Block" + (String)rnd + ".xml";
+		SharedPtr<File> fBlock1 = cache->GetFile(prefabName);
+		Node* blockNode = scene_->InstantiateXML(*fBlock1, blockPos, blockRot);
+		if (blockNode)
+			blocks_.Push(blockNode);
+
+		// And, then set actual transform of this block to get offset In node.
+		if (attached) {
+			Node* inNode = blockNode->GetChild("In");
+			Vector3 offset = inNode->GetVar("Offset").GetVector3();
+			Vector3 trans = inNode->GetWorldRotation() * offset;
+			blockNode->Translate(trans);
+		}
+
+		// Create coins.
+		Node* floorNode = blockNode->GetChild("Floor");
+		Vector3 floorDirection = floorNode->GetWorldDirection();
+		Vector3 floorRight = floorNode->GetWorldRight();
+		Vector3 pos = floorNode->GetWorldPosition();
+		pos.y_ += 1.0f;
+
+		// Check obstacles before creating coins to prevent cycling path.
+		Node* outNode = blockNode->GetChild("Out");
+		Vector3 outDir = outNode->GetWorldRotation() * Vector3::LEFT;
+		Vector3 origin = outNode->GetWorldPosition();
+		Ray ray = Ray(origin, outDir);
+		PhysicsWorld* world = scene_->GetComponent<PhysicsWorld>();
+		PhysicsRaycastResult result;
+		world->SphereCast(result, ray, 10, 20);
+
+		if (result.body_) {
+			PODVector<Node*> floors;
+			blockNode->GetChildrenWithComponent<StaticModel>(floors, true);
+			for (auto it = floors.Begin(); it != floors.End(); ++it) {
+				Node* node = *it;
+				String name = node->GetName();
+			}
+		}
+
+		/*Node* sphere = scene_->CreateChild("SphereCast");
+		StaticModel* mdl = sphere->CreateComponent<StaticModel>();
+		mdl->SetModel(cache->GetResource<Model>("Models/Sphere.mdl"));
+		mdl->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));
+		sphere->SetScale(Vector3(10, 10, 10));
+		sphere->SetPosition(origin);*/
+
+		Node* coin = 0;
+		XMLFile* cbXML = cache->GetResource<XMLFile>("Objects/CoinBlue.xml");
+		XMLFile* crXML = cache->GetResource<XMLFile>("Objects/CoinRed.xml");
+		XMLFile* cgXML = cache->GetResource<XMLFile>("Objects/CoinGold.xml");
+
+		if (cbXML) {
+			coin = scene_->InstantiateXML(cbXML->GetRoot(), pos, Quaternion::IDENTITY);
+			coin->Translate(floorRight * 3.0f + floorDirection);
+			coin = scene_->InstantiateXML(cbXML->GetRoot(), pos, Quaternion::IDENTITY);
+			coin->Translate(floorRight * 5.0f + floorDirection);
+			coin = scene_->InstantiateXML(cbXML->GetRoot(), pos, Quaternion::IDENTITY);
+			coin->Translate(floorRight * 7.0f + floorDirection);
+		}
+
+		if (crXML && cgXML) {
+			coin = scene_->InstantiateXML(crXML->GetRoot(), pos, Quaternion::IDENTITY);
+			coin->Translate(floorRight * -3.0f + -floorDirection);
+			coin = scene_->InstantiateXML(cgXML->GetRoot(), pos, Quaternion::IDENTITY);
+			coin->Translate(floorRight * -5.0f + -floorDirection);
+			coin = scene_->InstantiateXML(crXML->GetRoot(), pos, Quaternion::IDENTITY);
+			coin->Translate(floorRight * -7.0f + -floorDirection);
+		}
+
+		cnt--;
+	}
+}
+
+void AutoRunner::UpdatePath(bool startIn)
+{
+	List<Vector3> leftPoints;
+	List<Vector3> rightPoints;
+	List<Vector3> centerPoints;
+	bool goon = true;
+
+	while (goon)
+	{
+		Node* block = blocks_.Front();
+		int outs = block->GetVar("Out").GetInt();
+		Node* paths = block->GetChild("Paths");
+		String posix = (startIn || outs == 0) ? "In" : "Out";
+
+		Node* inNode = paths->GetChild("Center" + posix);
+		unsigned int numChildren = inNode->GetNumChildren();
+		for (unsigned int i = 0; i < numChildren; i++) {
+			Node* pointNode = inNode->GetChild(i);
+			centerPoints.Push(pointNode->GetWorldPosition());
+		}
+
+		inNode = paths->GetChild("Left" + posix);
+		numChildren = inNode->GetNumChildren();
+		for (unsigned int i = 0; i < numChildren; i++) {
+			Node* pointNode = inNode->GetChild(i);
+			leftPoints.Push(pointNode->GetWorldPosition());
+		}
+
+		inNode = paths->GetChild("Right" + posix);
+		numChildren = inNode->GetNumChildren();
+		for (unsigned int i = 0; i < numChildren; i++) {
+			Node* pointNode = inNode->GetChild(i);
+			rightPoints.Push(pointNode->GetWorldPosition());
+		}
+
+		switch (outs)
+		{
+		case 0:
+			{
+				blocks_.PopFront();
+				goon = blocks_.Size() > 0;
+			}
+			break;
+		case 1:
+		case 2:
+		default:
+			{
+				if (!startIn)
+				{
+					blocks_.PopFront();
+					startIn = true;
+					goon = blocks_.Size() > 0;
+				}
+				else
+				{
+					goon = false;
+				}
+			}
+			break;
+		}
+	}
+
+	character_->AddToPath(CharacterSide::LEFT_SIDE, leftPoints);
+	character_->AddToPath(CharacterSide::RIGHT_SIDE, rightPoints);
+	character_->AddToPath(CharacterSide::CENTER_SIDE, centerPoints);
 }
