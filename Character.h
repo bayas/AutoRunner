@@ -26,6 +26,8 @@
 #include "LogicComponent.h"
 #include "List.h"
 
+#define BIT(x) (1<<(x))
+
 using namespace Urho3D;
 
 const int CTRL_FORWARD = 1;
@@ -42,10 +44,21 @@ const float JUMP_FORCE = 7.0f;
 const float YAW_SENSITIVITY = 0.1f;
 const float INAIR_THRESHOLD_TIME = 0.1f;
 
-enum CharacterSide {
+const unsigned int FLOOR_COLLISION_MASK = BIT(1);
+const unsigned int COIN_COLLISION_MASK = BIT(2);
+
+enum CharacterSide
+{
 	LEFT_SIDE = 0,
 	RIGHT_SIDE,
 	CENTER_SIDE
+};
+
+enum JumpState
+{
+	START_JUMPING = 0,
+	LOOP_JUMPING,
+	STOP_JUMPING
 };
 
 typedef HashMap<unsigned int, List<Vector3>> RunPath;
@@ -66,6 +79,8 @@ public:
     virtual void Start();
     /// Handle physics world update. Called by LogicComponent base class.
 	virtual void FixedUpdate(float timeStep);
+	/// Handle scene post-update, Called by LogicCOmponent base class.
+	virtual void PostUpdate(float timeStep);
 
     /// Movement controls. Assigned by the main program each frame.
     Controls controls_;
@@ -77,10 +92,14 @@ public:
 	void RemoveFirstPoint();
 	unsigned int GetNumPoints() { return runPath_[currentSide_].Size(); }
 	void FollowPath(float timeStep);
+	bool HasTurnRequest() const;
+	void SetCurrentPlatform(Node* platform) { currentPlatform_ = platform; }
 
 private:
-    /// Handle physics collision event.
-    void HandleNodeCollision(StringHash eventType, VariantMap& eventData);
+    /// Handle physics collision events.
+	void HandleNodeCollision(StringHash eventType, VariantMap& eventData);
+	void HandleNodeCollisionStart(StringHash eventType, VariantMap& eventData);
+	void HandleNodeCollisionEnd(StringHash eventType, VariantMap& eventData);
 
     /// Grounded flag for movement.
     bool onGround_;
@@ -93,7 +112,12 @@ private:
 	bool CheckSide(int control);
 
 	int score_;
+	bool turnRequest_;
+	bool inTrigger_;
+	bool onJumpGround_;
 	CharacterSide currentSide_;
+	JumpState jumpState_;
 	RunPath runPath_;
+	Node* currentPlatform_;
 
 };

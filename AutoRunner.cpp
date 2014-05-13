@@ -53,6 +53,7 @@
 #include "PhysicsEvents.h"
 #include "SmoothedTransform.h"
 #include "DebugNew.h"
+#include "Log.h"
 
 // Expands to this example's entry-point
 DEFINE_APPLICATION_MAIN(AutoRunner)
@@ -115,24 +116,26 @@ void AutoRunner::CreateCharacter()
 {
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-	String headName = "Bip01_Head";
-	Node* objectNode = scene_->CreateChild("Jack");
+	Node* rootNode = scene_->CreateChild("VempireRoot");
+	Node* objectNode = rootNode->CreateChild("Vempire");
 	objectNode->SetPosition(Vector3(0.0f, 3.0f, -9.0f));
+	objectNode->SetScale(Vector3(.4f, .4f, .4f));
+	objectNode->SetRotation(Quaternion(180, Vector3::UP));
 
 	// Create the rendering component + animation controller
 	AnimatedModel* object = objectNode->CreateComponent<AnimatedModel>();
-	object->SetModel(cache->GetResource<Model>("Models/Jack.mdl"));
-	object->SetMaterial(cache->GetResource<Material>("Materials/Jack.xml"));
+	object->SetModel(cache->GetResource<Model>("Models/vempire.mdl"));
+	object->SetMaterial(cache->GetResource<Material>("Materials/Vempire.xml"));
 	object->SetCastShadows(true);
 	objectNode->CreateComponent<AnimationController>();
 
+	String headName = "Bip001 Head";
 	// Set the head bone for manual control
 	object->GetSkeleton().GetBone(headName)->animated_ = false;
 
 	// Create rigidbody, and set non-zero mass so that the body becomes dynamic
 	RigidBody* body = objectNode->CreateComponent<RigidBody>();
-	body->SetCollisionLayer(1);
-	//body->SetKinematic(true);
+	body->SetCollisionLayer(FLOOR_COLLISION_MASK|COIN_COLLISION_MASK);
 	body->SetMass(1.0f);
 
 	// Set zero angular factor so that physics doesn't turn the character on its own.
@@ -204,6 +207,16 @@ void AutoRunner::HandleFixedUpdate(StringHash eventType, VariantMap& eventData)
 {
 	using namespace PhysicsPreStep;
 
+	if (character_) {
+		Vector3 currentPoint;
+		if (character_->GetCurrentPoint(currentPoint)) {
+			Vector3 worldPos = character_->GetNode()->GetWorldPosition();
+			currentPoint.y_ = worldPos.y_;
+			float length = (worldPos - currentPoint).Length();
+			if (length <= 1.0f)
+				character_->RemoveFirstPoint();
+		}
+	}
 }
 
 void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
@@ -216,18 +229,9 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 
 	if (character_)
 	{
-		Vector3 currentPoint;
-		if (character_->GetCurrentPoint(currentPoint)) {
-			Vector3 worldPos = character_->GetNode()->GetWorldPosition();
-			currentPoint.y_ = worldPos.y_;
-			float length = (worldPos - currentPoint).Length();
-			if (length <= 0.1f)
-				character_->RemoveFirstPoint();
-		}
-
 		// Update path.
 		Vector3 point;
-		if (character_->GetNumPoints() <= 1) {
+		if (character_->GetNumPoints() <= 1 && character_->HasTurnRequest()) {
 			auto it = blocks_.Front();
 			int outs = it->GetVar("Out").GetInt();
 			if (outs == 0)
@@ -441,7 +445,7 @@ void AutoRunner::CreateInitialLevel()
 		pos.y_ += 1.0f;
 
 		// Check obstacles before creating coins to prevent cycling path.
-		Node* outNode = blockNode->GetChild("Out");
+		/*Node* outNode = blockNode->GetChild("Out");
 		Vector3 outDir = outNode->GetWorldRotation() * Vector3::LEFT;
 		Vector3 origin = outNode->GetWorldPosition();
 		Ray ray = Ray(origin, outDir);
@@ -458,7 +462,7 @@ void AutoRunner::CreateInitialLevel()
 			}
 		}
 
-		/*Node* sphere = scene_->CreateChild("SphereCast");
+		Node* sphere = scene_->CreateChild("SphereCast");
 		StaticModel* mdl = sphere->CreateComponent<StaticModel>();
 		mdl->SetModel(cache->GetResource<Model>("Models/Sphere.mdl"));
 		mdl->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));

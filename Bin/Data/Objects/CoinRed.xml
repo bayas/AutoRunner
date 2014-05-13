@@ -23,6 +23,7 @@
 		<component type="RigidBody" id="120">
 			<attribute name="Physics Rotation" value="0.445877 0.698702 0.115388 -0.547444" />
 			<attribute name="Physics Position" value="-13 2 5.10785" />
+			<attribute name="Collision Mask" value="4" />
 			<attribute name="Is Trigger" value="true" />
 		</component>
 	</node>

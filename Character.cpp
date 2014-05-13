@@ -31,6 +31,8 @@
 #include "SceneEvents.h"
 #include "Log.h"
 #include "SmoothedTransform.h"
+#include "AnimationState.h"
+#include "Ray.h"
 
 Character::Character(Context* context) :
     LogicComponent(context),
@@ -38,10 +40,15 @@ Character::Character(Context* context) :
     okToJump_(true),
     inAirTimer_(0.0f),
 	score_(0),
-	currentSide_(CharacterSide::CENTER_SIDE)
+	turnRequest_(false),
+	inTrigger_(false),
+	onJumpGround_(false),
+	currentPlatform_(0),
+	currentSide_(CharacterSide::CENTER_SIDE),
+	jumpState_(JumpState::STOP_JUMPING)
 {
-    // Only the physics update event is needed: unsubscribe from the rest for optimization
-    SetUpdateEventMask(USE_FIXEDUPDATE);
+	// Only the physics update event is needed: unsubscribe from the rest for optimization
+	SetUpdateEventMask(USE_FIXEDUPDATE|USE_POSTUPDATE);
 }
 
 void Character::RegisterObject(Context* context)
@@ -60,12 +67,15 @@ void Character::RegisterObject(Context* context)
 void Character::Start()
 {
     // Component has been inserted into its scene node. Subscribe to events now
-    SubscribeToEvent(GetNode(), E_NODECOLLISION, HANDLER(Character, HandleNodeCollision));
+	SubscribeToEvent(GetNode(), E_NODECOLLISION, HANDLER(Character, HandleNodeCollision));
+	SubscribeToEvent(GetNode(), E_NODECOLLISIONSTART, HANDLER(Character, HandleNodeCollisionStart));
+	SubscribeToEvent(GetNode(), E_NODECOLLISIONEND, HANDLER(Character, HandleNodeCollisionEnd));
 }
 
 float coolDown = 0.0f;
 int cntLeft = 0;
 int cntRight = 0;
+int cntLimit = 20;
 
 void Character::FixedUpdate(float timeStep)
 {
@@ -116,14 +126,7 @@ void Character::FixedUpdate(float timeStep)
 	if (coolDown <= 0 && !controls_.IsDown(CTRL_RIGHT))
 		cntRight = 0;
 
-	if (cntLeft > 1)
-		LOGDEBUG("cntLeft: " + (String)cntLeft);
-	if (cntRight > 1)
-		LOGDEBUG("cntRight: " + (String)cntRight);
-
-	//LOGDEBUG("Character Position: " + node_->GetWorldPosition().ToString());
-
-	if (coolDown == .3f)
+	if (coolDown == .3f && !inTrigger_)
 	{
 		if (controls_.IsDown(CTRL_LEFT) && CheckSide(CTRL_LEFT))
 		{
@@ -134,54 +137,124 @@ void Character::FixedUpdate(float timeStep)
 		if (controls_.IsDown(CTRL_RIGHT) && CheckSide(CTRL_RIGHT))
 		{
 			moveDir = Vector3::RIGHT;
-			body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
+			if (!inTrigger_)
+				body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
 		}
 	}
 
-    if (softGrounded)
-    {
-        // When on ground, apply a braking force to limit maximum ground velocity
+	if (softGrounded)
+	{
+		// When on ground, apply a braking force to limit maximum ground velocity
 		Vector3 brakeForce = -planeVelocity * BRAKE_FORCE;
 		body->ApplyImpulse(brakeForce);
 
-        // Jump. Must release jump control inbetween jumps
-        if (controls_.IsDown(CTRL_JUMP))
-        {
-            if (okToJump_)
-            {
-                body->ApplyImpulse(Vector3::UP * JUMP_FORCE);
-                okToJump_ = false;
-            }
-        }
-        else
-            okToJump_ = true;
-    }
-    
-    // Play walk animation if moving on ground, otherwise fade it out
-    if (softGrounded && !moveDir.Equals(Vector3::ZERO))
-        animCtrl->PlayExclusive("Models/Jack_Walk.ani", 0, true, 0.2f);
-    else
-        animCtrl->Stop("Models/Jack_Walk.ani", 0.2f);
-    // Set walk animation speed proportional to velocity
-    animCtrl->SetSpeed("Models/Jack_Walk.ani", planeVelocity.Length() * .8f);
-    
-    // Reset grounded flag for next frame
-    onGround_ = false;
+		// Jump. Must release jump control inbetween jumps
+		if (controls_.IsDown(CTRL_JUMP))
+		{
+			if (okToJump_)
+			{
+				body->ApplyImpulse(Vector3::UP * JUMP_FORCE);
+				okToJump_ = false;
+				LOGDEBUG("Stopping run.");
+				animCtrl->Stop("Models/vempire_run.ani", 0.2f);
+				animCtrl->Play("Models/vempire_jmpStart.ani", 0, false);
+				LOGDEBUG("Playing jump start.");
+				jumpState_ = START_JUMPING;
+			}
+		}
+		else
+		{
+			okToJump_ = true;
+		}
+	}
+
+	if (jumpState_ == START_JUMPING || jumpState_ == LOOP_JUMPING)
+	{
+		float minJmpLoop = 0.4f;
+		float minDistance = 0.1f;
+		PhysicsRaycastResult result;
+		Ray ray(node_->GetWorldPosition(), Vector3::DOWN);
+		node_->GetScene()->GetComponent<PhysicsWorld>()->RaycastSingle(result, ray, 100.0f, FLOOR_COLLISION_MASK);
+		if (result.body_)
+		{
+			if (result.distance_ < minJmpLoop)
+			{
+				if (jumpState_ == START_JUMPING)
+				{
+					animCtrl->Play("Models/vempire_jmpStart.ani", 0, false);
+					LOGDEBUG("Playing jump start.");
+				}
+				else if (jumpState_ == LOOP_JUMPING)
+				{
+					if (animCtrl->IsPlaying("Models/vempire_jmpLoop.ani"))
+					{
+						LOGDEBUG("Stopping jump loop.");
+						animCtrl->Stop("Models/vempire_jmpLoop.ani");
+					}
+
+					animCtrl->Play("Models/vempire_jmpEnd.ani", 0, false);
+					LOGDEBUG("Playing jump end.");
+
+					if (result.distance_ < minDistance)
+						jumpState_ = STOP_JUMPING;
+				}
+			}
+			else if (jumpState_ == START_JUMPING)
+			{
+				LOGDEBUG("Stopping jump start.");
+				animCtrl->Stop("Models/vempire_jmpStart.ani");
+				jumpState_ = LOOP_JUMPING;
+			}
+			else if (jumpState_ == LOOP_JUMPING)
+			{
+				animCtrl->Play("Models/vempire_jmpLoop.ani", 0, true);
+				LOGDEBUG("Playing jump loop.");
+			}
+		}
+	}
+
+	// Play walk animation if moving on ground, otherwise fade it out
+	if (jumpState_ == STOP_JUMPING && softGrounded && !moveDir.Equals(Vector3::ZERO))
+	{
+		LOGDEBUG("Playing run.");
+		animCtrl->Play("Models/vempire_run.ani", 0, true, 0.2f);
+		// Set walk animation speed proportional to velocity
+		animCtrl->SetSpeed("Models/vempire_run.ani", planeVelocity.Length() * 0.3f);
+	}
+	else
+	{
+		animCtrl->Stop("Models/vempire_run.ani", 0.2f);
+	}
+
+	// Reset grounded flag for next frame
+	onGround_ = false;
+}
+
+void Character::PostUpdate(float timeStep)
+{
+	return;
 }
 
 void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
 {
-    // Check collision contacts and see if character is standing on ground (look for a contact that has near vertical normal)
-    using namespace NodeCollision;
-    
-    MemoryBuffer contacts(eventData[P_CONTACTS].GetBuffer());
+	// Check collision contacts and see if character is standing on ground (look for a contact that has near vertical normal)
+	using namespace NodeCollision;
 	
-	// Get coin points
+	MemoryBuffer contacts(eventData[P_CONTACTS].GetBuffer());
 	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
-	String otherName = otherNode->GetName();
-	Variant pnt = otherNode->GetVar("Point");
-	if (pnt != Variant::EMPTY) {
-		score_ += pnt.GetInt();
+
+	// Check turn point
+	Variant var = otherNode->GetVar("TurnPoint");
+	if (!var.IsEmpty())
+	{
+		turnRequest_ = var.GetBool() && (cntLeft > cntLimit || cntRight > cntLimit);
+	}
+
+	// Get coin points
+	var = otherNode->GetVar("Point");
+	if (!var.IsEmpty())
+	{
+		score_ += var.GetInt();
 		otherNode->Remove();
 	}
 
@@ -191,15 +264,49 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
         Vector3 contactNormal = contacts.ReadVector3();
         float contactDistance = contacts.ReadFloat();
         float contactImpulse = contacts.ReadFloat();
-        
+
         // If contact is below node center and mostly vertical, assume it's a ground contact
         if (contactPosition.y_ < (node_->GetPosition().y_ + 1.0f))
         {
-            float level = Abs(contactNormal.y_);
+			float level = Abs(contactNormal.y_);
             if (level > 0.75)
                 onGround_ = true;
         }
     }
+}
+
+void Character::HandleNodeCollisionStart(StringHash eventType, VariantMap& eventData)
+{
+	using namespace NodeCollisionStart;
+
+	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
+
+	// Check turn point
+	Variant var = otherNode->GetVar("TurnPoint");
+	if (!var.IsEmpty())
+	{
+		turnRequest_ = var.GetBool() && (cntLeft > cntLimit || cntRight > cntLimit);
+		inTrigger_ = true;
+	}
+
+	// Check current platform.
+	var = otherNode->GetVar("IsInPlatform");
+	if (!var.IsEmpty())
+		currentPlatform_ = otherNode->GetParent();
+}
+
+void Character::HandleNodeCollisionEnd(StringHash eventType, VariantMap& eventData)
+{
+	using namespace NodeCollisionEnd;
+
+	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
+	// Check turn point
+	Variant var = otherNode->GetVar("TurnPoint");
+	if (!var.IsEmpty())
+	{
+		turnRequest_ = false;
+		inTrigger_ = false;
+	}
 }
 
 bool Character::CheckSide(int control)
@@ -264,7 +371,9 @@ bool Character::GetCurrentPoint(Vector3& point)
 
 void Character::RemoveFirstPoint()
 {
-	runPath_[currentSide_].PopFront();
+	runPath_[LEFT_SIDE].PopFront();
+	runPath_[RIGHT_SIDE].PopFront();
+	runPath_[CENTER_SIDE].PopFront();
 }
 
 void Character::FollowPath(float timeStep)
@@ -275,9 +384,30 @@ void Character::FollowPath(float timeStep)
 		Quaternion targetRotation;
 		targetRotation.FromLookRotation(nextWaypoint - node_->GetWorldPosition());
 		SmoothedTransform* smooth = node_->GetComponent<SmoothedTransform>();
-		LOGDEBUG("Target Rotation has NAN value: " + String(targetRotation.IsNaN() ? "TRUE" : "FALSE"));
 		if (!targetRotation.IsNaN())
 			smooth->SetTargetWorldRotation(targetRotation);
 		//node_->LookAt(nextWaypoint);
 	}
+}
+
+bool Character::HasTurnRequest() const
+{
+	if (!turnRequest_)
+		return false;
+
+	bool success = false;
+	int outs = currentPlatform_->GetVar("Out").GetInt();
+	if (outs > 0) {
+		bool leftOut = currentPlatform_->GetVar("LeftOut").GetBool();
+		bool rightOut = currentPlatform_->GetVar("RightOut").GetBool();
+
+		if (leftOut && rightOut)
+			success = true;
+		else if (leftOut)
+			success = cntLeft > cntLimit;
+		else if (rightOut)
+			success = cntRight > cntLimit;
+	}
+
+	return success;
 }

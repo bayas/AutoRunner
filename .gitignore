@@ -12,6 +12,7 @@
 *.exe
 *.ps3
 *.vs3
+Thumbs.db
 
 # Build results
 
