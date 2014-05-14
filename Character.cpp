@@ -84,7 +84,7 @@ void Character::FixedUpdate(float timeStep)
 
     /// \todo Could cache the components for faster access instead of finding them each frame
     RigidBody* body = GetComponent<RigidBody>();
-    AnimationController* animCtrl = GetComponent<AnimationController>();
+    AnimationController* animCtrl = node_->GetChild("PlayerModel")->GetComponent<AnimationController>();
     
     // Update the in air timer. Reset if grounded
     if (!onGround_)
@@ -155,10 +155,10 @@ void Character::FixedUpdate(float timeStep)
 			{
 				body->ApplyImpulse(Vector3::UP * JUMP_FORCE);
 				okToJump_ = false;
-				LOGDEBUG("Stopping run.");
+				//LOGDEBUG("Stopping run.");
 				animCtrl->Stop("Models/vempire_run.ani", 0.2f);
 				animCtrl->Play("Models/vempire_jmpStart.ani", 0, false);
-				LOGDEBUG("Playing jump start.");
+				//LOGDEBUG("Playing jump start.");
 				jumpState_ = START_JUMPING;
 			}
 		}
@@ -182,18 +182,18 @@ void Character::FixedUpdate(float timeStep)
 				if (jumpState_ == START_JUMPING)
 				{
 					animCtrl->Play("Models/vempire_jmpStart.ani", 0, false);
-					LOGDEBUG("Playing jump start.");
+					//LOGDEBUG("Playing jump start.");
 				}
 				else if (jumpState_ == LOOP_JUMPING)
 				{
 					if (animCtrl->IsPlaying("Models/vempire_jmpLoop.ani"))
 					{
-						LOGDEBUG("Stopping jump loop.");
+						//LOGDEBUG("Stopping jump loop.");
 						animCtrl->Stop("Models/vempire_jmpLoop.ani");
 					}
 
 					animCtrl->Play("Models/vempire_jmpEnd.ani", 0, false);
-					LOGDEBUG("Playing jump end.");
+					//LOGDEBUG("Playing jump end.");
 
 					if (result.distance_ < minDistance)
 						jumpState_ = STOP_JUMPING;
@@ -201,14 +201,14 @@ void Character::FixedUpdate(float timeStep)
 			}
 			else if (jumpState_ == START_JUMPING)
 			{
-				LOGDEBUG("Stopping jump start.");
+				//LOGDEBUG("Stopping jump start.");
 				animCtrl->Stop("Models/vempire_jmpStart.ani");
 				jumpState_ = LOOP_JUMPING;
 			}
 			else if (jumpState_ == LOOP_JUMPING)
 			{
 				animCtrl->Play("Models/vempire_jmpLoop.ani", 0, true);
-				LOGDEBUG("Playing jump loop.");
+				//LOGDEBUG("Playing jump loop.");
 			}
 		}
 	}
@@ -216,7 +216,7 @@ void Character::FixedUpdate(float timeStep)
 	// Play walk animation if moving on ground, otherwise fade it out
 	if (jumpState_ == STOP_JUMPING && softGrounded && !moveDir.Equals(Vector3::ZERO))
 	{
-		LOGDEBUG("Playing run.");
+		//LOGDEBUG("Playing run.");
 		animCtrl->Play("Models/vempire_run.ani", 0, true, 0.2f);
 		// Set walk animation speed proportional to velocity
 		animCtrl->SetSpeed("Models/vempire_run.ani", planeVelocity.Length() * 0.3f);

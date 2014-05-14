@@ -116,18 +116,18 @@ void AutoRunner::CreateCharacter()
 {
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-	Node* rootNode = scene_->CreateChild("VempireRoot");
-	Node* objectNode = rootNode->CreateChild("Vempire");
+	Node* objectNode = scene_->CreateChild("Player");
 	objectNode->SetPosition(Vector3(0.0f, 3.0f, -9.0f));
-	objectNode->SetScale(Vector3(.4f, .4f, .4f));
-	objectNode->SetRotation(Quaternion(180, Vector3::UP));
+	Node* modelNode = objectNode->CreateChild("PlayerModel");
+	modelNode->SetScale(Vector3(.4f, .4f, .4f));
+	modelNode->SetRotation(Quaternion(180, Vector3::UP));
 
 	// Create the rendering component + animation controller
-	AnimatedModel* object = objectNode->CreateComponent<AnimatedModel>();
+	AnimatedModel* object = modelNode->CreateComponent<AnimatedModel>();
 	object->SetModel(cache->GetResource<Model>("Models/vempire.mdl"));
 	object->SetMaterial(cache->GetResource<Material>("Materials/Vempire.xml"));
 	object->SetCastShadows(true);
-	objectNode->CreateComponent<AnimationController>();
+	modelNode->CreateComponent<AnimationController>();
 
 	String headName = "Bip001 Head";
 	// Set the head bone for manual control
@@ -147,14 +147,14 @@ void AutoRunner::CreateCharacter()
 
 	// Set a capsule shape for collision
 	CollisionShape* shape = objectNode->CreateComponent<CollisionShape>();
-	shape->SetCapsule(0.7f, 1.8f, Vector3(0.0f, 0.9f, 0.0f));
+	shape->SetCapsule(0.9f, 1.5f, Vector3(0.0f, 0.9f, 0.0f));
 
 	// Create the character logic component, which takes care of steering the rigidbody
 	// Remember it so that we can set the controls. Use a WeakPtr because the scene hierarchy already owns it
 	// and keeps it alive as long as it's not removed from the hierarchy
 	character_ = objectNode->CreateComponent<Character>();
 	// Set the head of this character body.
-	characterHead_ = objectNode->GetChild(headName, true);
+	characterHead_ = modelNode->GetChild(headName, true);
 
 	// Add smoothed transform component.
 	objectNode->CreateComponent<SmoothedTransform>();
@@ -394,7 +394,10 @@ void AutoRunner::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventD
 {
 	// If draw debug mode is enabled, draw viewport debug geometry. Disable depth test so that we can see the effect of occlusion
 	if (drawDebug_)
+	{
 		GetSubsystem<Renderer>()->DrawDebugGeometry(false);
+		scene_->GetComponent<PhysicsWorld>()->DrawDebugGeometry(true);
+	}
 }
 
 void AutoRunner::CreateInitialLevel()
