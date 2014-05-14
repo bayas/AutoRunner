@@ -30,11 +30,11 @@
 
 using namespace Urho3D;
 
-const int CTRL_FORWARD = 1;
-//const int CTRL_BACK = 2;
-const int CTRL_LEFT = 4;
-const int CTRL_RIGHT = 8;
-const int CTRL_JUMP = 16;
+const int CTRL_FORWARD = BIT(0);
+//const int CTRL_BACK = BIT(1);
+const int CTRL_LEFT = BIT(2);
+const int CTRL_RIGHT = BIT(3);
+const int CTRL_JUMP = BIT(4);
 
 const float MOVE_FORCE = 1.2f;
 const float MOVE_SIDE_FORCE = 13.0f;

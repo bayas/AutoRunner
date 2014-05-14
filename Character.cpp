@@ -232,6 +232,7 @@ void Character::FixedUpdate(float timeStep)
 
 void Character::PostUpdate(float timeStep)
 {
+	//LOGDEBUG("Character Node Scale: " + node_->GetWorldScale().ToString());
 	return;
 }
 
@@ -381,12 +382,26 @@ void Character::FollowPath(float timeStep)
 	Vector3 nextWaypoint = Vector3::ZERO; 
 	if (GetCurrentPoint(nextWaypoint)) {
 		nextWaypoint.y_ = node_->GetWorldPosition().y_;
+		Vector3 targetPos = nextWaypoint - node_->GetWorldPosition();
 		Quaternion targetRotation;
-		targetRotation.FromLookRotation(nextWaypoint - node_->GetWorldPosition());
+		targetRotation.FromLookRotation(targetPos);
 		SmoothedTransform* smooth = node_->GetComponent<SmoothedTransform>();
-		if (!targetRotation.IsNaN())
+		float yaw = targetRotation.YawAngle();
+		float minYaw = -178.0f;
+		float maxYaw = 178.0f;
+		//LOGDEBUG("Target Yaw Angle: " + String(yaw));
+		yaw = Urho3D::Clamp(yaw, minYaw, maxYaw);
+		float absYaw = Urho3D::Abs(yaw);
+		if ((absYaw > 0 && absYaw < 1) || yaw == minYaw || yaw == maxYaw)
+			yaw = 0;
+
+		if (!targetRotation.IsNaN() && yaw)
+		{
+			//targetRotation = node_->GetParent()->GetWorldRotation().Inverse() * targetRotation;
+			//node_->SetRotation(targetRotation);
 			smooth->SetTargetWorldRotation(targetRotation);
-		//node_->LookAt(nextWaypoint);
+			//node_->LookAt(nextWaypoint);
+		}
 	}
 }
 
