@@ -52,8 +52,8 @@
 #include "XMLFile.h"
 #include "PhysicsEvents.h"
 #include "SmoothedTransform.h"
-#include "DebugNew.h"
 #include "Log.h"
+#include "DebugNew.h"
 
 // Expands to this example's entry-point
 DEFINE_APPLICATION_MAIN(AutoRunner)
@@ -105,7 +105,6 @@ void AutoRunner::InitScene()
 	scene_ = new Scene(context_);
 	File loadFile(context_, fs->GetProgramDir() + "Data/Scenes/AutoRunner.xml", FILE_READ);
 	scene_->LoadXML(loadFile);
-	CreateInitialLevel();
 
 	// Pass knowledge of the scene & camera node to the Touch helper object.
 	touch_->scene_ = scene_;
@@ -147,7 +146,7 @@ void AutoRunner::CreateCharacter()
 
 	// Set a capsule shape for collision
 	CollisionShape* shape = objectNode->CreateComponent<CollisionShape>();
-	shape->SetCapsule(0.7f, 1.5f, Vector3(0.0f, 0.9f, 0.0f));
+	shape->SetCapsule(0.7f, 1.5f, Vector3(0.0f, 0.8f, 0.0f));
 
 	// Create the character logic component, which takes care of steering the rigidbody
 	// Remember it so that we can set the controls. Use a WeakPtr because the scene hierarchy already owns it
@@ -235,7 +234,7 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 			auto it = blocks_.Front();
 			int outs = it->GetVar("Out").GetInt();
 			if (outs == 0)
-				blocks_.PopFront();
+				AddToRemoveFirstBlock();
 
 			UpdatePath(false);
 		}
@@ -341,6 +340,16 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 	// Toggle debug geometry with space
 	if (input->GetKeyPress(KEY_F3))
 		drawDebug_ = !drawDebug_;
+
+	if (input->GetKeyPress(KEY_F4))
+	{
+		Camera* cam = cameraNode_->GetComponent<Camera>();
+		FillMode mode = cam->GetFillMode();
+		if (mode == FILL_WIREFRAME)
+			cam->SetFillMode(FILL_SOLID);
+		else
+			cam->SetFillMode(FILL_WIREFRAME);
+	}
 }
 
 void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
@@ -388,6 +397,8 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 		cameraNode_->SetPosition(aimPoint + rayDir * rayDistance);
 		cameraNode_->SetRotation(dir);
 	}
+
+	CreateLevel();
 }
 
 void AutoRunner::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
@@ -398,14 +409,35 @@ void AutoRunner::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventD
 		GetSubsystem<Renderer>()->DrawDebugGeometry(false);
 		scene_->GetComponent<PhysicsWorld>()->DrawDebugGeometry(true);
 	}
+
+	DebugRenderer* debug = scene_->GetComponent<DebugRenderer>();
+	for (unsigned int i = 0; i < lines_.Size(); i++)
+	{
+		DebugLine line = lines_[i];
+		debug->AddLine(line.start_, line.end_, line.color_);
+	}
+
+	for (unsigned int i = 0; i < spheres_.Size(); i++)
+	{
+		debug->AddSphere(spheres_[i], Color::RED);
+	}
 }
 
-void AutoRunner::CreateInitialLevel()
+void AutoRunner::CreateLevel()
 {
-	int cnt = 15;
+	static int cnt = 3;
+	static int maxRecursive = 30;
+
+	if (cnt == 0 && blocks_.Size() < 2)
+	{
+		cnt = 3;
+		RemoveUnusedBlock(1);
+	}
+
+	int seed = 483;
 	int maxBlockNumber = 4;
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
-	SetRandomSeed(443);
+	SetRandomSeed(seed);
 
 	while (cnt > 0) {
 		bool attached = false;
@@ -429,8 +461,6 @@ void AutoRunner::CreateInitialLevel()
 		String prefabName = "Objects/Block" + (String)rnd + ".xml";
 		SharedPtr<File> fBlock1 = cache->GetFile(prefabName);
 		Node* blockNode = scene_->InstantiateXML(*fBlock1, blockPos, blockRot);
-		if (blockNode)
-			blocks_.Push(blockNode);
 
 		// And, then set actual transform of this block to get offset In node.
 		if (attached) {
@@ -448,29 +478,30 @@ void AutoRunner::CreateInitialLevel()
 		pos.y_ += 1.0f;
 
 		// Check obstacles before creating coins to prevent cycling path.
-		/*Node* outNode = blockNode->GetChild("Out");
+		Node* outNode = blockNode->GetChild("Out");
 		Vector3 outDir = outNode->GetWorldRotation() * Vector3::LEFT;
 		Vector3 origin = outNode->GetWorldPosition();
-		Ray ray = Ray(origin, outDir);
-		PhysicsWorld* world = scene_->GetComponent<PhysicsWorld>();
+		Ray ray(origin, outDir);
 		PhysicsRaycastResult result;
-		world->SphereCast(result, ray, 10, 20);
 
-		if (result.body_) {
-			PODVector<Node*> floors;
-			blockNode->GetChildrenWithComponent<StaticModel>(floors, true);
-			for (auto it = floors.Begin(); it != floors.End(); ++it) {
-				Node* node = *it;
-				String name = node->GetName();
-			}
+		PhysicsWorld* world = scene_->GetComponent<PhysicsWorld>();
+		world->RaycastSingle(result, ray, 20.0f, FLOOR_COLLISION_MASK);
+		//lines_.Push(DebugLine(origin, origin + outDir * 20.0f, Color::RED.ToUInt()));
+
+		if (result.body_)
+		{
+			if (maxRecursive == 0)
+				assert(false);
+
+			SetRandomSeed(++seed);
+			blockNode->Remove();
+			maxRecursive--;
+			continue;
 		}
-
-		Node* sphere = scene_->CreateChild("SphereCast");
-		StaticModel* mdl = sphere->CreateComponent<StaticModel>();
-		mdl->SetModel(cache->GetResource<Model>("Models/Sphere.mdl"));
-		mdl->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));
-		sphere->SetScale(Vector3(10, 10, 10));
-		sphere->SetPosition(origin);*/
+		else
+		{
+			maxRecursive = 30;
+		}
 
 		Node* coin = 0;
 		XMLFile* cbXML = cache->GetResource<XMLFile>("Objects/CoinBlue.xml");
@@ -480,22 +511,30 @@ void AutoRunner::CreateInitialLevel()
 		if (cbXML) {
 			coin = scene_->InstantiateXML(cbXML->GetRoot(), pos, Quaternion::IDENTITY);
 			coin->Translate(floorRight * 3.0f + floorDirection);
+			coin->SetParent(blockNode);
 			coin = scene_->InstantiateXML(cbXML->GetRoot(), pos, Quaternion::IDENTITY);
 			coin->Translate(floorRight * 5.0f + floorDirection);
+			coin->SetParent(blockNode);
 			coin = scene_->InstantiateXML(cbXML->GetRoot(), pos, Quaternion::IDENTITY);
 			coin->Translate(floorRight * 7.0f + floorDirection);
+			coin->SetParent(blockNode);
 		}
 
 		if (crXML && cgXML) {
 			coin = scene_->InstantiateXML(crXML->GetRoot(), pos, Quaternion::IDENTITY);
 			coin->Translate(floorRight * -3.0f + -floorDirection);
+			coin->SetParent(blockNode);
 			coin = scene_->InstantiateXML(cgXML->GetRoot(), pos, Quaternion::IDENTITY);
 			coin->Translate(floorRight * -5.0f + -floorDirection);
+			coin->SetParent(blockNode);
 			coin = scene_->InstantiateXML(crXML->GetRoot(), pos, Quaternion::IDENTITY);
 			coin->Translate(floorRight * -7.0f + -floorDirection);
+			coin->SetParent(blockNode);
 		}
 
+		blocks_.Push(blockNode);
 		cnt--;
+		break;
 	}
 }
 
@@ -504,7 +543,7 @@ void AutoRunner::UpdatePath(bool startIn)
 	List<Vector3> leftPoints;
 	List<Vector3> rightPoints;
 	List<Vector3> centerPoints;
-	bool goon = true;
+	bool goon = blocks_.Size() > 0;
 
 	while (goon)
 	{
@@ -538,7 +577,7 @@ void AutoRunner::UpdatePath(bool startIn)
 		{
 		case 0:
 			{
-				blocks_.PopFront();
+				AddToRemoveFirstBlock();
 				goon = blocks_.Size() > 0;
 			}
 			break;
@@ -548,7 +587,7 @@ void AutoRunner::UpdatePath(bool startIn)
 			{
 				if (!startIn)
 				{
-					blocks_.PopFront();
+					AddToRemoveFirstBlock();
 					startIn = true;
 					goon = blocks_.Size() > 0;
 				}
@@ -564,4 +603,27 @@ void AutoRunner::UpdatePath(bool startIn)
 	character_->AddToPath(CharacterSide::LEFT_SIDE, leftPoints);
 	character_->AddToPath(CharacterSide::RIGHT_SIDE, rightPoints);
 	character_->AddToPath(CharacterSide::CENTER_SIDE, centerPoints);
+}
+
+void AutoRunner::AddToRemoveFirstBlock()
+{
+	if (blocks_.Size() <= 0)
+		return;
+
+	removedBlocks_.Push(blocks_.Front());
+	blocks_.PopFront();
+}
+
+void AutoRunner::RemoveUnusedBlock(unsigned int loop)
+{
+	if (removedBlocks_.Size() <= 0)
+		return;
+
+	loop = Clamp(loop, 1, 10);
+	while (loop)
+	{
+		removedBlocks_.Front()->Remove();
+		removedBlocks_.PopFront();
+		loop--;
+	}
 }

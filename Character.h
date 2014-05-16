@@ -81,6 +81,8 @@ public:
 	virtual void FixedUpdate(float timeStep);
 	/// Handle scene post-update, Called by LogicCOmponent base class.
 	virtual void PostUpdate(float timeStep);
+	/// Visualize the component as debug geometry.
+	virtual void DrawDebugGeometry(DebugRenderer* debug, bool depthTest);
 
     /// Movement controls. Assigned by the main program each frame.
     Controls controls_;

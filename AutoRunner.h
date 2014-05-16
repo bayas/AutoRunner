@@ -23,6 +23,7 @@
 #pragma once
 
 #include "Sample.h"
+#include "DebugRenderer.h"
 
 namespace Urho3D
 {
@@ -32,6 +33,8 @@ namespace Urho3D
 
 class Character;
 class Touch;
+
+typedef PODVector<Pair<Node*, Node*>> SeperatePath;
 
 class AutoRunner : public Sample
 {
@@ -80,10 +83,16 @@ private:
 	bool drawDebug_;
 
 	/// Game mechanics.
-	void CreateInitialLevel();
+	void CreateLevel();
 	void UpdatePath(bool startIn = true);
+	void AddToRemoveFirstBlock();
+	void RemoveUnusedBlock(unsigned int loop);
 
 	List<Node*> blocks_;
+	List<Node*> removedBlocks_;
 	Text* scoreText_;
 	Node* characterHead_;
+	PODVector<DebugLine> lines_;
+	PODVector<Sphere> spheres_;
+
 };

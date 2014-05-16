@@ -33,6 +33,12 @@
 #include "SmoothedTransform.h"
 #include "AnimationState.h"
 #include "Ray.h"
+#include "DebugRenderer.h"
+
+namespace Urho3D
+{
+	extern const char* SCENE_CATEGORY;
+}
 
 Character::Character(Context* context) :
     LogicComponent(context),
@@ -53,7 +59,7 @@ Character::Character(Context* context) :
 
 void Character::RegisterObject(Context* context)
 {
-    context->RegisterFactory<Character>();
+    context->RegisterFactory<Character>(SCENE_CATEGORY);
     
     // These macros register the class attributes to the Context for automatic load / save handling.
     // We specify the Default attribute mode which means it will be used both for saving into file, and network replication
@@ -236,6 +242,11 @@ void Character::PostUpdate(float timeStep)
 	return;
 }
 
+void Character::DrawDebugGeometry(DebugRenderer* debug, bool depthTest)
+{
+	debug->AddSphere(Sphere(Vector3::ONE, 10.0f), Color(1, 1, 1));
+}
+
 void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
 {
 	// Check collision contacts and see if character is standing on ground (look for a contact that has near vertical normal)
@@ -353,6 +364,9 @@ bool Character::CheckSide(int control)
 
 void Character::AddToPath(CharacterSide side, const List<Vector3>& points)
 {
+	if (points.Empty())
+		return;
+
 	auto it = runPath_.Find(side);
 	if (it == runPath_.End())
 		runPath_[side] = points;
@@ -417,7 +431,9 @@ bool Character::HasTurnRequest() const
 		bool rightOut = currentPlatform_->GetVar("RightOut").GetBool();
 
 		if (leftOut && rightOut)
+		{
 			success = true;
+		}
 		else if (leftOut)
 			success = cntLeft > cntLimit;
 		else if (rightOut)
