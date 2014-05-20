@@ -64,9 +64,11 @@ AutoRunner::AutoRunner(Context* context) :
 	yaw_(0.0f),
 	pitch_(0.0f),
 	drawDebug_(false),
-	scoreText_(0)
+	scoreText_(0),
+	seed_(483)
 {
 	Character::RegisterObject(context);
+	lastOutWorldTransform_ = Matrix3x4(Vector3::ZERO, Quaternion(90, Vector3(0, 1, 0)), 1);
 }
 
 void AutoRunner::Start()
@@ -116,7 +118,7 @@ void AutoRunner::CreateCharacter()
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
 	Node* objectNode = scene_->CreateChild("Player");
-	objectNode->SetPosition(Vector3(0.0f, 3.0f, -9.0f));
+	objectNode->SetPosition(Vector3(0.0f, 3.0f, 0.0f));
 	Node* modelNode = objectNode->CreateChild("PlayerModel");
 	modelNode->SetScale(Vector3(.4f, .4f, .4f));
 	modelNode->SetRotation(Quaternion(180, Vector3::UP));
@@ -158,8 +160,8 @@ void AutoRunner::CreateCharacter()
 	// Add smoothed transform component.
 	objectNode->CreateComponent<SmoothedTransform>();
 
-	// Update first path.
-	UpdatePath();
+	// Create initial level and update the follow-path.
+	CreateLevel();
 }
 
 void AutoRunner::CreateCamera()
@@ -231,74 +233,14 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 		// Update path.
 		Vector3 point;
 		if (character_->GetNumPoints() <= 1 && character_->HasTurnRequest()) {
-			auto it = blocks_.Front();
-			int outs = it->GetVar("Out").GetInt();
-			if (outs == 0)
-				AddToRemoveFirstBlock();
-
 			UpdatePath(false);
+			character_->RemovePassedBlocks();
+
+			if (blocks_.Size() <= 0)
+				CreateLevel();
 		}
 
 		character_->FollowPath(timeStep);
-
-		// Create Incremental Blocks.
-		/*Vector3 worldPos = character_->GetNode()->GetWorldPosition();
-		Node* lastRoadBlock = blocks_.Back();
-		Vector3 tailPos = lastRoadBlock->GetWorldPosition();
-		Vector3 target = blockPos - worldPos;
-		if (target.Length() < 3) {
-			int randNumber = Rand();
-			String fileName = String::EMPTY;
-
-			if (1/ *randNumber % 2 == 0* /) { // straight road block
-				fileName = "Objects/Block1.xml";
-				blockPos += Vector3(0, 0, 20);
-			} else if (randNumber % 3 == 0) {// cornered road block
-				fileName = "Objects/RoadBlock1.xml";
-				blockPos += Vector3(0, 0, 90);
-			} else { // sloped road block
-				fileName = "Objects/RoadBlock3.xml";
-				blockPos += Vector3(0, 0, 89);
-			}
-
-			SharedPtr<File> fBlock1 = cache->GetFile(fileName);
-			Node* blockNode = scene_->InstantiateXML(*fBlock1, blockPos, Quaternion::IDENTITY);
-			if (blockNode)
-				blocks_.Push(blockNode);
-
-			// Create coins
-			PODVector<Node*> allBlocks;
-			blockNode->GetChildren(allBlocks, true);
-			for (auto it = allBlocks.Begin(); it != allBlocks.End(); ++it) {
-				Node* floorNode = *it;
-				if (floorNode->GetName() == "Floor") {
-					Vector3 pos = floorNode->GetWorldPosition();
-					XMLFile* cbXML = cache->GetResource<XMLFile>("Objects/CoinBlue.xml");
-					XMLFile* crXML = cache->GetResource<XMLFile>("Objects/CoinRed.xml");
-					XMLFile* cgXML = cache->GetResource<XMLFile>("Objects/CoinGold.xml");
-					if (cbXML) {
-						scene_->InstantiateXML(cbXML->GetRoot(), pos + Vector3(-1, 1, -1), Quaternion::IDENTITY);
-						scene_->InstantiateXML(cbXML->GetRoot(), pos + Vector3(-1, 1, -3), Quaternion::IDENTITY);
-						scene_->InstantiateXML(cbXML->GetRoot(), pos + Vector3(-1, 1, -5), Quaternion::IDENTITY);
-					}
-
-					if (crXML) {
-						scene_->InstantiateXML(crXML->GetRoot(), pos + Vector3(1, 1, 7), Quaternion::IDENTITY);
-						scene_->InstantiateXML(cgXML->GetRoot(), pos + Vector3(1, 1, 10), Quaternion::IDENTITY);
-						scene_->InstantiateXML(crXML->GetRoot(), pos + Vector3(1, 1, 13), Quaternion::IDENTITY);
-					}
-				}
-			}
-
-		}
-
-		// Remove unused blocks from block list.
-		if (blocks_.Size() > 2) {
-			Node* block = blocks_.Front();
-			block->Remove();
-			blocks_.PopFront();
-		}*/
-
 		// Clear previous controls
 		character_->controls_.Set(CTRL_FORWARD | CTRL_LEFT | CTRL_RIGHT /*| CTRL_BACK */| CTRL_JUMP, false);
 
@@ -341,6 +283,7 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 	if (input->GetKeyPress(KEY_F3))
 		drawDebug_ = !drawDebug_;
 
+	// Toggle fill mode on main camera
 	if (input->GetKeyPress(KEY_F4))
 	{
 		Camera* cam = cameraNode_->GetComponent<Camera>();
@@ -397,8 +340,6 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 		cameraNode_->SetPosition(aimPoint + rayDir * rayDistance);
 		cameraNode_->SetRotation(dir);
 	}
-
-	CreateLevel();
 }
 
 void AutoRunner::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
@@ -425,50 +366,28 @@ void AutoRunner::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventD
 
 void AutoRunner::CreateLevel()
 {
-	static int cnt = 3;
-	static int maxRecursive = 30;
-
-	if (cnt == 0 && blocks_.Size() < 2)
-	{
-		cnt = 3;
-		RemoveUnusedBlock(1);
-	}
-
-	int seed = 483;
-	int maxBlockNumber = 4;
+	int cnt = 3;
+	int maxRecursive = 30;
+	int maxBlockNumber = 3;
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
-	SetRandomSeed(seed);
 
-	while (cnt > 0) {
-		bool attached = false;
-		Vector3 blockPos = Vector3::ZERO;
-		Quaternion blockRot = Quaternion(90, Vector3(0, 1, 0));
-
-		if (blocks_.Size() > 0) {
-			// Get last block from array.
-			Node* lastBlock = blocks_.Back();
-			// Get Out variables.
-			int outs = lastBlock->GetVar("Out").GetInt();
-			// Get Out's node.
-			Node* outNode = lastBlock->GetChild("Out");
-			blockPos = outNode->GetWorldPosition();
-			blockRot = outNode->GetWorldRotation();
-			attached = true;
-		}
+	ChangeSeed();
+	while (cnt > 0)
+	{
+		Vector3 blockPos = lastOutWorldTransform_.Translation();
+		Quaternion blockRot = lastOutWorldTransform_.Rotation();
 
 		// Initial transform has been given from out node.
-		int rnd = (Rand() % maxBlockNumber) + 1;
-		String prefabName = "Objects/Block" + (String)rnd + ".xml";
+		int rnd = Random(maxBlockNumber) + 1;
+		String prefabName = "Objects/Block" + String(rnd) + ".xml";
 		SharedPtr<File> fBlock1 = cache->GetFile(prefabName);
 		Node* blockNode = scene_->InstantiateXML(*fBlock1, blockPos, blockRot);
 
 		// And, then set actual transform of this block to get offset In node.
-		if (attached) {
-			Node* inNode = blockNode->GetChild("In");
-			Vector3 offset = inNode->GetVar("Offset").GetVector3();
-			Vector3 trans = inNode->GetWorldRotation() * offset;
-			blockNode->Translate(trans);
-		}
+		Node* inNode = blockNode->GetChild("In");
+		Vector3 offset = inNode->GetVar("Offset").GetVector3();
+		Vector3 trans = inNode->GetWorldRotation() * offset;
+		blockNode->Translate(trans);
 
 		// Create coins.
 		Node* floorNode = blockNode->GetChild("Floor");
@@ -493,7 +412,7 @@ void AutoRunner::CreateLevel()
 			if (maxRecursive == 0)
 				assert(false);
 
-			SetRandomSeed(++seed);
+			ChangeSeed();
 			blockNode->Remove();
 			maxRecursive--;
 			continue;
@@ -503,7 +422,7 @@ void AutoRunner::CreateLevel()
 			maxRecursive = 30;
 		}
 
-		Node* coin = 0;
+		/*Node* coin = 0;
 		XMLFile* cbXML = cache->GetResource<XMLFile>("Objects/CoinBlue.xml");
 		XMLFile* crXML = cache->GetResource<XMLFile>("Objects/CoinRed.xml");
 		XMLFile* cgXML = cache->GetResource<XMLFile>("Objects/CoinGold.xml");
@@ -530,12 +449,22 @@ void AutoRunner::CreateLevel()
 			coin = scene_->InstantiateXML(crXML->GetRoot(), pos, Quaternion::IDENTITY);
 			coin->Translate(floorRight * -7.0f + -floorDirection);
 			coin->SetParent(blockNode);
-		}
+		}*/
 
-		blocks_.Push(blockNode);
 		cnt--;
-		break;
+		lastOutWorldTransform_ = Matrix3x4(outNode->GetWorldPosition(), outNode->GetWorldRotation(), 1);
+		blocks_.Push(blockNode);
+
+		// If the last block is the straight then,
+		// Go ahead creating the block until the last block is turned one.
+		if (cnt == 0 && rnd == 1)
+		{
+			ChangeSeed();
+			cnt++;
+		}
 	}
+
+	UpdatePath();
 }
 
 void AutoRunner::UpdatePath(bool startIn)
@@ -543,61 +472,62 @@ void AutoRunner::UpdatePath(bool startIn)
 	List<Vector3> leftPoints;
 	List<Vector3> rightPoints;
 	List<Vector3> centerPoints;
-	bool goon = blocks_.Size() > 0;
 
-	while (goon)
+	while (blocks_.Size() > 0)
 	{
 		Node* block = blocks_.Front();
 		int outs = block->GetVar("Out").GetInt();
+
 		Node* paths = block->GetChild("Paths");
 		String posix = (startIn || outs == 0) ? "In" : "Out";
-
 		Node* inNode = paths->GetChild("Center" + posix);
 		unsigned int numChildren = inNode->GetNumChildren();
-		for (unsigned int i = 0; i < numChildren; i++) {
+
+		for (unsigned int i = 0; i < numChildren; i++)
+		{
 			Node* pointNode = inNode->GetChild(i);
 			centerPoints.Push(pointNode->GetWorldPosition());
+			// Create a box-model component to see each path point.
+			/*StaticModel* boxObject = pointNode->CreateComponent<StaticModel>();
+			boxObject->SetModel(GetSubsystem<ResourceCache>()->GetResource<Model>("Models/Box.mdl"));
+			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));*/
 		}
 
 		inNode = paths->GetChild("Left" + posix);
 		numChildren = inNode->GetNumChildren();
-		for (unsigned int i = 0; i < numChildren; i++) {
+
+		for (unsigned int i = 0; i < numChildren; i++)
+		{
 			Node* pointNode = inNode->GetChild(i);
 			leftPoints.Push(pointNode->GetWorldPosition());
+			// Create a box-model component to see each path point.
+			/*StaticModel* boxObject = pointNode->CreateComponent<StaticModel>();
+			boxObject->SetModel(GetSubsystem<ResourceCache>()->GetResource<Model>("Models/Box.mdl"));
+			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));*/
 		}
 
 		inNode = paths->GetChild("Right" + posix);
 		numChildren = inNode->GetNumChildren();
-		for (unsigned int i = 0; i < numChildren; i++) {
+
+		for (unsigned int i = 0; i < numChildren; i++)
+		{
 			Node* pointNode = inNode->GetChild(i);
 			rightPoints.Push(pointNode->GetWorldPosition());
+			// Create a box-model component to see each path point.
+			/*StaticModel* boxObject = pointNode->CreateComponent<StaticModel>();
+			boxObject->SetModel(GetSubsystem<ResourceCache>()->GetResource<Model>("Models/Box.mdl"));
+			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));*/
 		}
 
-		switch (outs)
+		if (outs > 0)
 		{
-		case 0:
-			{
-				AddToRemoveFirstBlock();
-				goon = blocks_.Size() > 0;
-			}
-			break;
-		case 1:
-		case 2:
-		default:
-			{
-				if (!startIn)
-				{
-					AddToRemoveFirstBlock();
-					startIn = true;
-					goon = blocks_.Size() > 0;
-				}
-				else
-				{
-					goon = false;
-				}
-			}
-			break;
+			if (!startIn)
+				startIn = true;
+			else
+				break;
 		}
+
+		blocks_.PopFront();
 	}
 
 	character_->AddToPath(CharacterSide::LEFT_SIDE, leftPoints);
@@ -605,25 +535,16 @@ void AutoRunner::UpdatePath(bool startIn)
 	character_->AddToPath(CharacterSide::CENTER_SIDE, centerPoints);
 }
 
-void AutoRunner::AddToRemoveFirstBlock()
+void AutoRunner::ChangeSeed()
 {
-	if (blocks_.Size() <= 0)
-		return;
-
-	removedBlocks_.Push(blocks_.Front());
-	blocks_.PopFront();
-}
-
-void AutoRunner::RemoveUnusedBlock(unsigned int loop)
-{
-	if (removedBlocks_.Size() <= 0)
-		return;
-
-	loop = Clamp(loop, 1, 10);
-	while (loop)
+	int seedFactor = Random(1, 10);
+	if (seedFactor % 2 == 0)
+		seed_ ++;
+	else
 	{
-		removedBlocks_.Front()->Remove();
-		removedBlocks_.PopFront();
-		loop--;
+		if (seed_ > 0)
+			seed_--;
 	}
+
+	SetRandomSeed(seed_);
 }

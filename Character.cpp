@@ -304,7 +304,17 @@ void Character::HandleNodeCollisionStart(StringHash eventType, VariantMap& event
 	// Check current platform.
 	var = otherNode->GetVar("IsInPlatform");
 	if (!var.IsEmpty())
-		currentPlatform_ = otherNode->GetParent();
+	{
+		Node* enteringPlatform = otherNode->GetParent();
+
+		if (currentPlatform_)
+		{
+			if (currentPlatform_->GetID() != enteringPlatform->GetID())
+				passedBlocks_.Push(currentPlatform_);
+		}
+
+		currentPlatform_ = enteringPlatform;
+	}
 }
 
 void Character::HandleNodeCollisionEnd(StringHash eventType, VariantMap& eventData)
@@ -441,4 +451,15 @@ bool Character::HasTurnRequest() const
 	}
 
 	return success;
+}
+
+void Character::RemovePassedBlocks()
+{
+	if (passedBlocks_.Size() <= 0)
+		return;
+
+	for (auto it = passedBlocks_.Begin(); it != passedBlocks_.End(); ++it)
+		(*it)->Remove();
+
+	passedBlocks_.Clear();
 }

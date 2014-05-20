@@ -96,6 +96,7 @@ public:
 	void FollowPath(float timeStep);
 	bool HasTurnRequest() const;
 	void SetCurrentPlatform(Node* platform) { currentPlatform_ = platform; }
+	void RemovePassedBlocks();
 
 private:
     /// Handle physics collision events.
@@ -121,5 +122,6 @@ private:
 	JumpState jumpState_;
 	RunPath runPath_;
 	Node* currentPlatform_;
+	PODVector<Node*> passedBlocks_;
 
 };

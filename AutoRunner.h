@@ -85,11 +85,11 @@ private:
 	/// Game mechanics.
 	void CreateLevel();
 	void UpdatePath(bool startIn = true);
-	void AddToRemoveFirstBlock();
-	void RemoveUnusedBlock(unsigned int loop);
+	void ChangeSeed();
 
+	unsigned int seed_;
 	List<Node*> blocks_;
-	List<Node*> removedBlocks_;
+	Matrix3x4 lastOutWorldTransform_;
 	Text* scoreText_;
 	Node* characterHead_;
 	PODVector<DebugLine> lines_;
