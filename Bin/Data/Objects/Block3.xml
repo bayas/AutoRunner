@@ -304,12 +304,50 @@
 			<variant hash="56819" type="Bool" value="true" />
 		</attribute>
 		<component type="CollisionShape" id="16777227">
-			<attribute name="Size" value="8 4 6" />
+			<attribute name="Size" value="4 4 5" />
 			<attribute name="Model" value="Model;Models/Sphere.mdl" />
 		</component>
 		<component type="RigidBody" id="16777228">
 			<attribute name="Physics Position" value="22 2.5 -10" />
 			<attribute name="Is Trigger" value="true" />
 		</component>
+	</node>
+	<node id="16777561">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Slots" />
+		<attribute name="Position" value="0 0 0" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<node id="16777562">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Slot" />
+			<attribute name="Position" value="5.56023 1 0.936653" />
+			<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables">
+				<variant hash="32061" type="Bool" value="true" />
+			</attribute>
+		</node>
+		<node id="16777563">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Slot" />
+			<attribute name="Position" value="-2.19469 1 -0.895422" />
+			<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables">
+				<variant hash="32061" type="Bool" value="true" />
+			</attribute>
+		</node>
+		<node id="16777564">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Slot" />
+			<attribute name="Position" value="2.5939 1 0.0103683" />
+			<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables">
+				<variant hash="32061" type="Bool" value="true" />
+			</attribute>
+		</node>
 	</node>
 </node>

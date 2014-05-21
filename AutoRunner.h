@@ -85,9 +85,7 @@ private:
 	/// Game mechanics.
 	void CreateLevel();
 	void UpdatePath(bool startIn = true);
-	void ChangeSeed();
 
-	unsigned int seed_;
 	List<Node*> blocks_;
 	Matrix3x4 lastOutWorldTransform_;
 	Text* scoreText_;

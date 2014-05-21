@@ -64,10 +64,10 @@ AutoRunner::AutoRunner(Context* context) :
 	yaw_(0.0f),
 	pitch_(0.0f),
 	drawDebug_(false),
-	scoreText_(0),
-	seed_(483)
+	scoreText_(0)
 {
 	Character::RegisterObject(context);
+	SetRandomSeed(Time::GetSystemTime());
 	lastOutWorldTransform_ = Matrix3x4(Vector3::ZERO, Quaternion(90, Vector3(0, 1, 0)), 1);
 }
 
@@ -371,7 +371,6 @@ void AutoRunner::CreateLevel()
 	int maxBlockNumber = 3;
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-	ChangeSeed();
 	while (cnt > 0)
 	{
 		Vector3 blockPos = lastOutWorldTransform_.Translation();
@@ -389,13 +388,6 @@ void AutoRunner::CreateLevel()
 		Vector3 trans = inNode->GetWorldRotation() * offset;
 		blockNode->Translate(trans);
 
-		// Create coins.
-		Node* floorNode = blockNode->GetChild("Floor");
-		Vector3 floorDirection = floorNode->GetWorldDirection();
-		Vector3 floorRight = floorNode->GetWorldRight();
-		Vector3 pos = floorNode->GetWorldPosition();
-		pos.y_ += 1.0f;
-
 		// Check obstacles before creating coins to prevent cycling path.
 		Node* outNode = blockNode->GetChild("Out");
 		Vector3 outDir = outNode->GetWorldRotation() * Vector3::LEFT;
@@ -412,7 +404,6 @@ void AutoRunner::CreateLevel()
 			if (maxRecursive == 0)
 				assert(false);
 
-			ChangeSeed();
 			blockNode->Remove();
 			maxRecursive--;
 			continue;
@@ -422,34 +413,44 @@ void AutoRunner::CreateLevel()
 			maxRecursive = 30;
 		}
 
-		/*Node* coin = 0;
-		XMLFile* cbXML = cache->GetResource<XMLFile>("Objects/CoinBlue.xml");
-		XMLFile* crXML = cache->GetResource<XMLFile>("Objects/CoinRed.xml");
-		XMLFile* cgXML = cache->GetResource<XMLFile>("Objects/CoinGold.xml");
-
-		if (cbXML) {
-			coin = scene_->InstantiateXML(cbXML->GetRoot(), pos, Quaternion::IDENTITY);
-			coin->Translate(floorRight * 3.0f + floorDirection);
-			coin->SetParent(blockNode);
-			coin = scene_->InstantiateXML(cbXML->GetRoot(), pos, Quaternion::IDENTITY);
-			coin->Translate(floorRight * 5.0f + floorDirection);
-			coin->SetParent(blockNode);
-			coin = scene_->InstantiateXML(cbXML->GetRoot(), pos, Quaternion::IDENTITY);
-			coin->Translate(floorRight * 7.0f + floorDirection);
-			coin->SetParent(blockNode);
+		// Create coins in appropriate slots.
+		Node* slots = blockNode->GetChild("Slots");
+		PODVector<Node*> coinSlots;
+		for (unsigned int slotIndex = 0; slotIndex < slots->GetNumChildren(); slotIndex++)
+		{
+			Node* slot = slots->GetChild(slotIndex);
+			if (!slot->GetVar("FitToCoin").IsEmpty())
+				coinSlots.Push(slot);
 		}
 
-		if (crXML && cgXML) {
-			coin = scene_->InstantiateXML(crXML->GetRoot(), pos, Quaternion::IDENTITY);
-			coin->Translate(floorRight * -3.0f + -floorDirection);
-			coin->SetParent(blockNode);
-			coin = scene_->InstantiateXML(cgXML->GetRoot(), pos, Quaternion::IDENTITY);
-			coin->Translate(floorRight * -5.0f + -floorDirection);
-			coin->SetParent(blockNode);
-			coin = scene_->InstantiateXML(crXML->GetRoot(), pos, Quaternion::IDENTITY);
-			coin->Translate(floorRight * -7.0f + -floorDirection);
-			coin->SetParent(blockNode);
-		}*/
+		if (!coinSlots.Empty())
+		{
+			int slotSize = coinSlots.Size() - 1;
+			int slotIndex = Random(slotSize);
+			LOGDEBUG("slotSize | slotIndex: " + String(slotSize) + " | " + String(slotIndex));
+			Node* firstFit = coinSlots[slotIndex];
+			Vector3 slotPos = firstFit->GetWorldPosition();
+			Quaternion slotRotation = firstFit->GetWorldRotation();
+			
+			int point = Random(1, 10);
+			String coinObjName = String::EMPTY;
+
+			if (point == 1)
+				coinObjName = "Objects/CoinRed.xml";
+			else if (point == 5)
+				coinObjName = "Objects/CoinGold.xml";
+			else
+				coinObjName = "Objects/CoinBlue.xml";
+
+			XMLFile* coinObj = cache->GetResource<XMLFile>(coinObjName);
+			if (coinObj)
+			{
+				Quaternion rot;
+				float degree = rot.DotProduct(blockRot);
+				Node* coinNode = scene_->InstantiateXML(coinObj->GetRoot(), slotPos, slotRotation);
+				coinNode->SetParent(blockNode);
+			}
+		}
 
 		cnt--;
 		lastOutWorldTransform_ = Matrix3x4(outNode->GetWorldPosition(), outNode->GetWorldRotation(), 1);
@@ -459,7 +460,7 @@ void AutoRunner::CreateLevel()
 		// Go ahead creating the block until the last block is turned one.
 		if (cnt == 0 && rnd == 1)
 		{
-			ChangeSeed();
+			// TODO: check the length of straight path.
 			cnt++;
 		}
 	}
@@ -533,18 +534,4 @@ void AutoRunner::UpdatePath(bool startIn)
 	character_->AddToPath(CharacterSide::LEFT_SIDE, leftPoints);
 	character_->AddToPath(CharacterSide::RIGHT_SIDE, rightPoints);
 	character_->AddToPath(CharacterSide::CENTER_SIDE, centerPoints);
-}
-
-void AutoRunner::ChangeSeed()
-{
-	int seedFactor = Random(1, 10);
-	if (seedFactor % 2 == 0)
-		seed_ ++;
-	else
-	{
-		if (seed_ > 0)
-			seed_--;
-	}
-
-	SetRandomSeed(seed_);
 }
