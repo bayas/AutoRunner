@@ -148,6 +148,7 @@
     <ClCompile Include="Touch.cpp" />
     <ClInclude Include="AutoRunner.h" />
     <ClInclude Include="Character.h" />
+    <ClInclude Include="Param.h" />
     <ClInclude Include="Sample.h" />
     <ClInclude Include="Sample.inl" />
     <ClCompile Include="AutoRunner.cpp" />

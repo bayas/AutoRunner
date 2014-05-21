@@ -34,6 +34,7 @@
 #include "AnimationState.h"
 #include "Ray.h"
 #include "DebugRenderer.h"
+#include "Param.h"
 
 namespace Urho3D
 {
@@ -51,7 +52,8 @@ Character::Character(Context* context) :
 	onJumpGround_(false),
 	currentPlatform_(0),
 	currentSide_(CharacterSide::CENTER_SIDE),
-	jumpState_(JumpState::STOP_JUMPING)
+	jumpState_(JumpState::STOP_JUMPING),
+	turnState_(TurnState::NO_SUCCEEDED)
 {
 	// Only the physics update event is needed: unsubscribe from the rest for optimization
 	SetUpdateEventMask(USE_FIXEDUPDATE|USE_POSTUPDATE);
@@ -78,13 +80,13 @@ void Character::Start()
 	SubscribeToEvent(GetNode(), E_NODECOLLISIONEND, HANDLER(Character, HandleNodeCollisionEnd));
 }
 
-float coolDown = 0.0f;
-int cntLeft = 0;
-int cntRight = 0;
-int cntLimit = 20;
-
 void Character::FixedUpdate(float timeStep)
 {
+	static float coolDown = 0.0f;
+	static int cntLeft = 0;
+	static int cntRight = 0;
+	static int cntLimit = 20;
+
 	if (coolDown > 0)
 		coolDown -= timeStep;
 
@@ -116,6 +118,9 @@ void Character::FixedUpdate(float timeStep)
 	if (controls_.IsDown(CTRL_LEFT))
 	{
 		cntLeft++;
+		if (cntLeft > cntLimit)
+			turnState_ = TurnState::LEFT_SUCCEEDED;
+
 		if (coolDown <= 0 && onGround_)
 			coolDown = .3f;
 	}
@@ -123,14 +128,24 @@ void Character::FixedUpdate(float timeStep)
 	if (controls_.IsDown(CTRL_RIGHT))
 	{
 		cntRight++;
+		if (cntRight > cntLimit)
+			turnState_ = TurnState::RIGHT_SUCCEEDED;
+
 		if (coolDown <= 0 && onGround_)
 			coolDown = .3f;
 	}
 
 	if (coolDown <= 0 && !controls_.IsDown(CTRL_LEFT))
+	{
 		cntLeft = 0;
+		turnState_ = TurnState::NO_SUCCEEDED;
+	}
+
 	if (coolDown <= 0 && !controls_.IsDown(CTRL_RIGHT))
+	{
 		cntRight = 0;
+		turnState_ = TurnState::NO_SUCCEEDED;
+	}
 
 	if (coolDown == .3f && !inTrigger_)
 	{
@@ -256,14 +271,14 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
 	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
 
 	// Check turn point
-	Variant var = otherNode->GetVar("TurnPoint");
+	Variant var = otherNode->GetVar(GameVarirants::P_TURNPOINT);
 	if (!var.IsEmpty())
 	{
-		turnRequest_ = var.GetBool() && (cntLeft > cntLimit || cntRight > cntLimit);
+		turnRequest_ = var.GetBool() && (turnState_ != TurnState::NO_SUCCEEDED);
 	}
 
 	// Get coin points
-	var = otherNode->GetVar("Point");
+	var = otherNode->GetVar(GameVarirants::P_POINT);
 	if (!var.IsEmpty())
 	{
 		score_ += var.GetInt();
@@ -294,15 +309,15 @@ void Character::HandleNodeCollisionStart(StringHash eventType, VariantMap& event
 	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
 
 	// Check turn point
-	Variant var = otherNode->GetVar("TurnPoint");
+	Variant var = otherNode->GetVar(GameVarirants::P_TURNPOINT);
 	if (!var.IsEmpty())
 	{
-		turnRequest_ = var.GetBool() && (cntLeft > cntLimit || cntRight > cntLimit);
+		turnRequest_ = var.GetBool() && (turnState_ != TurnState::NO_SUCCEEDED);
 		inTrigger_ = true;
 	}
 
 	// Check current platform.
-	var = otherNode->GetVar("IsInPlatform");
+	var = otherNode->GetVar(GameVarirants::P_ISINPLATFORM);
 	if (!var.IsEmpty())
 	{
 		Node* enteringPlatform = otherNode->GetParent();
@@ -323,7 +338,7 @@ void Character::HandleNodeCollisionEnd(StringHash eventType, VariantMap& eventDa
 
 	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
 	// Check turn point
-	Variant var = otherNode->GetVar("TurnPoint");
+	Variant var = otherNode->GetVar(GameVarirants::P_TURNPOINT);
 	if (!var.IsEmpty())
 	{
 		turnRequest_ = false;
@@ -429,25 +444,18 @@ void Character::FollowPath(float timeStep)
 	}
 }
 
-bool Character::HasTurnRequest() const
+bool Character::HasTurnRequest()
 {
 	if (!turnRequest_)
 		return false;
 
 	bool success = false;
-	int outs = currentPlatform_->GetVar("Out").GetInt();
+	int outs = currentPlatform_->GetVar(GameVarirants::P_OUT).GetInt();
 	if (outs > 0) {
-		bool leftOut = currentPlatform_->GetVar("LeftOut").GetBool();
-		bool rightOut = currentPlatform_->GetVar("RightOut").GetBool();
+		bool leftOut = currentPlatform_->GetVar(GameVarirants::P_LEFTOUT).GetBool();
+		bool rightOut = currentPlatform_->GetVar(GameVarirants::P_RIGHTOUT).GetBool();
 
-		if (leftOut && rightOut)
-		{
-			success = true;
-		}
-		else if (leftOut)
-			success = cntLeft > cntLimit;
-		else if (rightOut)
-			success = cntRight > cntLimit;
+		success = (leftOut && turnState_ == TurnState::LEFT_SUCCEEDED) || (rightOut && turnState_ == TurnState::RIGHT_SUCCEEDED);
 	}
 
 	return success;

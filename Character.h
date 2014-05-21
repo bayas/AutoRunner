@@ -61,6 +61,13 @@ enum JumpState
 	STOP_JUMPING
 };
 
+enum TurnState
+{
+	NO_SUCCEEDED = 0,
+	LEFT_SUCCEEDED,
+	RIGHT_SUCCEEDED
+};
+
 typedef HashMap<unsigned int, List<Vector3>> RunPath;
 
 /// Character component, responsible for physical movement according to controls, as well as animation.
@@ -87,16 +94,18 @@ public:
     /// Movement controls. Assigned by the main program each frame.
     Controls controls_;
 
-	int GetScore() { return score_; }
-	CharacterSide GetSide() { return currentSide_; }
-	void AddToPath(CharacterSide side, const List<Vector3>& points);
+	void FollowPath(float timeStep);
+	bool HasTurnRequest();
 	bool GetCurrentPoint(Vector3& point);
 	void RemoveFirstPoint();
-	unsigned int GetNumPoints() { return runPath_[currentSide_].Size(); }
-	void FollowPath(float timeStep);
-	bool HasTurnRequest() const;
-	void SetCurrentPlatform(Node* platform) { currentPlatform_ = platform; }
 	void RemovePassedBlocks();
+	void AddToPath(CharacterSide side, const List<Vector3>& points);
+
+	int GetScore() { return score_; }
+	CharacterSide GetSide() { return currentSide_; }
+	unsigned int GetNumPoints() { return runPath_[currentSide_].Size(); }
+	TurnState GetTurnState() { return turnState_; }
+	void SetCurrentPlatform(Node* platform) { currentPlatform_ = platform; }
 
 private:
     /// Handle physics collision events.
@@ -118,8 +127,11 @@ private:
 	bool turnRequest_;
 	bool inTrigger_;
 	bool onJumpGround_;
+
 	CharacterSide currentSide_;
 	JumpState jumpState_;
+	TurnState turnState_;
+
 	RunPath runPath_;
 	Node* currentPlatform_;
 	PODVector<Node*> passedBlocks_;

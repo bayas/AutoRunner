@@ -85,6 +85,7 @@ private:
 	/// Game mechanics.
 	void CreateLevel();
 	void UpdatePath(bool startIn = true);
+	String GetRandomCoinObjectName();
 
 	List<Node*> blocks_;
 	Matrix3x4 lastOutWorldTransform_;

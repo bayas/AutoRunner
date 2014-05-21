@@ -23,7 +23,7 @@
 	</node>
 	<node id="16777271">
 		<attribute name="Is Enabled" value="true" />
-		<attribute name="Name" value="Out" />
+		<attribute name="Name" value="OutR" />
 		<attribute name="Position" value="-8 0 18" />
 		<attribute name="Rotation" value="0.707107 0 0.707107 0" />
 		<attribute name="Scale" value="1 1 1" />
@@ -31,7 +31,7 @@
 	</node>
 	<node id="16777274">
 		<attribute name="Is Enabled" value="true" />
-		<attribute name="Name" value="Out" />
+		<attribute name="Name" value="OutL" />
 		<attribute name="Position" value="-8 0 -18" />
 		<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
 		<attribute name="Scale" value="1 1 1" />
@@ -204,7 +204,7 @@
 		</node>
 		<node id="16777446">
 			<attribute name="Is Enabled" value="true" />
-			<attribute name="Name" value="CenterOut" />
+			<attribute name="Name" value="CenterOutR" />
 			<attribute name="Position" value="-8 0.5 9" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
@@ -244,7 +244,7 @@
 		</node>
 		<node id="16777458">
 			<attribute name="Is Enabled" value="true" />
-			<attribute name="Name" value="CenterOut" />
+			<attribute name="Name" value="CenterOutL" />
 			<attribute name="Position" value="-8 0.5 -9" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
@@ -284,7 +284,7 @@
 		</node>
 		<node id="16777482">
 			<attribute name="Is Enabled" value="true" />
-			<attribute name="Name" value="LeftOut" />
+			<attribute name="Name" value="LeftOutR" />
 			<attribute name="Position" value="-9.2 0.5 9" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
@@ -324,7 +324,7 @@
 		</node>
 		<node id="16777494">
 			<attribute name="Is Enabled" value="true" />
-			<attribute name="Name" value="LeftOut" />
+			<attribute name="Name" value="LeftOutL" />
 			<attribute name="Position" value="-6.8 0.5 -9" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
@@ -364,7 +364,7 @@
 		</node>
 		<node id="16777506">
 			<attribute name="Is Enabled" value="true" />
-			<attribute name="Name" value="RightOut" />
+			<attribute name="Name" value="RightOutR" />
 			<attribute name="Position" value="-6.8 0.5 9" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
@@ -404,8 +404,8 @@
 		</node>
 		<node id="16777470">
 			<attribute name="Is Enabled" value="true" />
-			<attribute name="Name" value="RightOut" />
-			<attribute name="Position" value="-9.2 0.5 -9" />
+			<attribute name="Name" value="RightOutL" />
+			<attribute name="Position" value="-9.2 0.809584 -9" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />

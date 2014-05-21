@@ -54,6 +54,7 @@
 #include "SmoothedTransform.h"
 #include "Log.h"
 #include "DebugNew.h"
+#include "Param.h"
 
 // Expands to this example's entry-point
 DEFINE_APPLICATION_MAIN(AutoRunner)
@@ -309,15 +310,6 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 	Quaternion rot = Quaternion(yaw_, Vector3::UP);
 	Quaternion dir = rot * Quaternion(pitch_, Vector3::RIGHT);
 
-	// Turn head to camera pitch, but limit to avoid unnatural animation.
-	/*Vector3 headWorldTarget; 
-	if (character_->GetCurrentPoint(headWorldTarget)) {
-		headWorldTarget.y_ = characterHead_->GetWorldPosition().y_;
-		characterHead_->LookAt(headWorldTarget, Vector3(0.0f, 1.0f, 0.0f));
-		// Correct head orientation because LookAt assumes Z = forward, but the bone has been authored differently (Y = forward)
-		characterHead_->Rotate(Quaternion(0.0f, 90.0f, 90.0f));
-	}*/
-
 	if (touch_->firstPerson_)
 	{
 		cameraNode_->SetPosition(characterHead_->GetWorldPosition() + rot * Vector3(0.0f, 0.15f, 0.2f));
@@ -368,7 +360,7 @@ void AutoRunner::CreateLevel()
 {
 	int cnt = 3;
 	int maxRecursive = 30;
-	int maxBlockNumber = 3;
+	int maxBlockNumber = 4;
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
 	while (cnt > 0)
@@ -381,37 +373,62 @@ void AutoRunner::CreateLevel()
 		String prefabName = "Objects/Block" + String(rnd) + ".xml";
 		SharedPtr<File> fBlock1 = cache->GetFile(prefabName);
 		Node* blockNode = scene_->InstantiateXML(*fBlock1, blockPos, blockRot);
+		int outs = blockNode->GetVar(GameVarirants::P_OUT).GetInt();
 
 		// And, then set actual transform of this block to get offset In node.
 		Node* inNode = blockNode->GetChild("In");
-		Vector3 offset = inNode->GetVar("Offset").GetVector3();
+		Vector3 offset = inNode->GetVar(GameVarirants::P_OFFSET).GetVector3();
 		Vector3 trans = inNode->GetWorldRotation() * offset;
 		blockNode->Translate(trans);
 
 		// Check obstacles before creating coins to prevent cycling path.
-		Node* outNode = blockNode->GetChild("Out");
-		Vector3 outDir = outNode->GetWorldRotation() * Vector3::LEFT;
-		Vector3 origin = outNode->GetWorldPosition();
-		Ray ray(origin, outDir);
-		PhysicsRaycastResult result;
-
-		PhysicsWorld* world = scene_->GetComponent<PhysicsWorld>();
-		world->RaycastSingle(result, ray, 20.0f, FLOOR_COLLISION_MASK);
-		//lines_.Push(DebugLine(origin, origin + outDir * 20.0f, Color::RED.ToUInt()));
-
-		if (result.body_)
+		String posix = String::EMPTY;
+		int twoWay = 1;
+		// If the path is two way turned.
+		if (outs >= 2)
 		{
-			if (maxRecursive == 0)
-				assert(false);
+			posix = "R";
+			twoWay++;
+		}
 
-			blockNode->Remove();
-			maxRecursive--;
+		bool accepted = true;
+		Node* outNode = blockNode->GetChild("Out" + posix);
+
+		while (twoWay > 0)
+		{
+			Vector3 outDir = outNode->GetWorldRotation() * Vector3::LEFT;
+			Vector3 origin = outNode->GetWorldPosition();
+			Ray ray(origin, outDir);
+			PhysicsRaycastResult result;
+
+			PhysicsWorld* world = scene_->GetComponent<PhysicsWorld>();
+			world->RaycastSingle(result, ray, 20.0f, FLOOR_COLLISION_MASK);
+
+			if (result.body_)
+			{
+				if (maxRecursive == 0)
+					assert(false);
+
+				blockNode->Remove();
+				maxRecursive--;
+				accepted = false;
+				break;
+			}
+			else
+			{
+				maxRecursive = 30;
+			}
+
+			// We tried first way as an Right posix, then will be trying other way as a Left posix.
+			if (outs >= 2)
+				posix = "L";
+
+			twoWay--;
+		}
+
+		// If this created is not accepted then continue.
+		if (!accepted)
 			continue;
-		}
-		else
-		{
-			maxRecursive = 30;
-		}
 
 		// Create coins in appropriate slots.
 		Node* slots = blockNode->GetChild("Slots");
@@ -419,7 +436,7 @@ void AutoRunner::CreateLevel()
 		for (unsigned int slotIndex = 0; slotIndex < slots->GetNumChildren(); slotIndex++)
 		{
 			Node* slot = slots->GetChild(slotIndex);
-			if (!slot->GetVar("FitToCoin").IsEmpty())
+			if (!slot->GetVar(GameVarirants::P_FITTOCOIN).IsEmpty())
 				coinSlots.Push(slot);
 		}
 
@@ -427,42 +444,32 @@ void AutoRunner::CreateLevel()
 		{
 			int slotSize = coinSlots.Size() - 1;
 			int slotIndex = Random(slotSize);
-			LOGDEBUG("slotSize | slotIndex: " + String(slotSize) + " | " + String(slotIndex));
 			Node* firstFit = coinSlots[slotIndex];
-			Vector3 slotPos = firstFit->GetWorldPosition();
-			Quaternion slotRotation = firstFit->GetWorldRotation();
-			
-			int point = Random(1, 10);
-			String coinObjName = String::EMPTY;
+			XMLFile* coinObj = cache->GetResource<XMLFile>(GetRandomCoinObjectName());
 
-			if (point == 1)
-				coinObjName = "Objects/CoinRed.xml";
-			else if (point == 5)
-				coinObjName = "Objects/CoinGold.xml";
-			else
-				coinObjName = "Objects/CoinBlue.xml";
-
-			XMLFile* coinObj = cache->GetResource<XMLFile>(coinObjName);
 			if (coinObj)
 			{
-				Quaternion rot;
-				float degree = rot.DotProduct(blockRot);
-				Node* coinNode = scene_->InstantiateXML(coinObj->GetRoot(), slotPos, slotRotation);
+				Node* coinNode = scene_->InstantiateXML(coinObj->GetRoot(), firstFit->GetWorldPosition(), firstFit->GetWorldRotation());
 				coinNode->SetParent(blockNode);
 			}
 		}
 
 		cnt--;
-		lastOutWorldTransform_ = Matrix3x4(outNode->GetWorldPosition(), outNode->GetWorldRotation(), 1);
 		blocks_.Push(blockNode);
 
 		// If the last block is the straight then,
 		// Go ahead creating the block until the last block is turned one.
 		if (cnt == 0 && rnd == 1)
 		{
-			// TODO: check the length of straight path.
+			// TODO: You should check the length of straight path.
 			cnt++;
 		}
+
+		// If the block is the last one that has two way turned, then set the cnt is zero.
+		if (rnd == 4)
+			cnt = 0;
+
+		lastOutWorldTransform_ = Matrix3x4(outNode->GetWorldPosition(), outNode->GetWorldRotation(), 1);
 	}
 
 	UpdatePath();
@@ -477,16 +484,38 @@ void AutoRunner::UpdatePath(bool startIn)
 	while (blocks_.Size() > 0)
 	{
 		Node* block = blocks_.Front();
-		int outs = block->GetVar("Out").GetInt();
+		int outs = block->GetVar(GameVarirants::P_OUT).GetInt();
 
 		Node* paths = block->GetChild("Paths");
 		String posix = (startIn || outs == 0) ? "In" : "Out";
-		Node* inNode = paths->GetChild("Center" + posix);
-		unsigned int numChildren = inNode->GetNumChildren();
+		// Check the block whether it has two way outs or not, 
+		// then add the "L" or "R" to the posix.
+		if (outs >= 2 && !startIn)
+		{
+			TurnState lastState = character_->GetTurnState();
+			if (lastState == TurnState::NO_SUCCEEDED)
+				return;
+
+			if (lastState == TurnState::LEFT_SUCCEEDED)
+			{
+				posix += "L";
+			}
+			else
+			{
+				posix += "R";
+			}
+
+			// Set the last out world transform.
+			Node* outNode = block->GetChild(posix);
+			lastOutWorldTransform_ = Matrix3x4(outNode->GetWorldPosition(), outNode->GetWorldRotation(), 1);
+		}
+
+		Node* path = paths->GetChild("Center" + posix);
+		unsigned int numChildren = path->GetNumChildren();
 
 		for (unsigned int i = 0; i < numChildren; i++)
 		{
-			Node* pointNode = inNode->GetChild(i);
+			Node* pointNode = path->GetChild(i);
 			centerPoints.Push(pointNode->GetWorldPosition());
 			// Create a box-model component to see each path point.
 			/*StaticModel* boxObject = pointNode->CreateComponent<StaticModel>();
@@ -494,12 +523,12 @@ void AutoRunner::UpdatePath(bool startIn)
 			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));*/
 		}
 
-		inNode = paths->GetChild("Left" + posix);
-		numChildren = inNode->GetNumChildren();
+		path = paths->GetChild("Left" + posix);
+		numChildren = path->GetNumChildren();
 
 		for (unsigned int i = 0; i < numChildren; i++)
 		{
-			Node* pointNode = inNode->GetChild(i);
+			Node* pointNode = path->GetChild(i);
 			leftPoints.Push(pointNode->GetWorldPosition());
 			// Create a box-model component to see each path point.
 			/*StaticModel* boxObject = pointNode->CreateComponent<StaticModel>();
@@ -507,12 +536,12 @@ void AutoRunner::UpdatePath(bool startIn)
 			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));*/
 		}
 
-		inNode = paths->GetChild("Right" + posix);
-		numChildren = inNode->GetNumChildren();
+		path = paths->GetChild("Right" + posix);
+		numChildren = path->GetNumChildren();
 
 		for (unsigned int i = 0; i < numChildren; i++)
 		{
-			Node* pointNode = inNode->GetChild(i);
+			Node* pointNode = path->GetChild(i);
 			rightPoints.Push(pointNode->GetWorldPosition());
 			// Create a box-model component to see each path point.
 			/*StaticModel* boxObject = pointNode->CreateComponent<StaticModel>();
@@ -534,4 +563,19 @@ void AutoRunner::UpdatePath(bool startIn)
 	character_->AddToPath(CharacterSide::LEFT_SIDE, leftPoints);
 	character_->AddToPath(CharacterSide::RIGHT_SIDE, rightPoints);
 	character_->AddToPath(CharacterSide::CENTER_SIDE, centerPoints);
+}
+
+String AutoRunner::GetRandomCoinObjectName()
+{
+	String coinObjName = String::EMPTY;
+	int point = Random(1, 10);
+
+	if (point == 1)
+		coinObjName = "Objects/CoinRed.xml";
+	else if (point == 5)
+		coinObjName = "Objects/CoinGold.xml";
+	else
+		coinObjName = "Objects/CoinBlue.xml";
+
+	return coinObjName;
 }
