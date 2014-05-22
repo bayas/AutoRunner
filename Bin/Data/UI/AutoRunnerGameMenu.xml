@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<element type="Menu">
+	<attribute name="Name" value="GameMenu" />
+	<attribute name="Position" value="800 400" />
+	<attribute name="Size" value="300 200" />
+	<attribute name="Blend Mode" value="multiply" />
+	<element type="Button">
+		<attribute name="Name" value="PlayBtn" />
+		<attribute name="Position" value="80 0" />
+		<attribute name="Size" value="50 20" />
+		<attribute name="Vert Alignment" value="Center" />
+		<element type="Text">
+			<attribute name="Name" value="PlayText" />
+			<attribute name="Horiz Alignment" value="Center" />
+			<attribute name="Vert Alignment" value="Center" />
+			<attribute name="Top Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Top Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Is Editable" value="false" />
+			<attribute name="Bring To Front" value="true" />
+			<attribute name="Bring To Back" value="false" />
+			<attribute name="Indent Spacing" value="20" />
+			<attribute name="Font" value="Font;Fonts/BlueHighway.ttf" />
+			<attribute name="Font Size" value="15" />
+			<attribute name="Text" value="PLAY!" />
+			<attribute name="Text Alignment" value="Center" />
+		</element>
+	</element>
+	<element type="Button">
+		<attribute name="Name" value="ExitBtn" />
+		<attribute name="Position" value="160 0" />
+		<attribute name="Size" value="50 20" />
+		<attribute name="Vert Alignment" value="Center" />
+		<element type="Text">
+			<attribute name="Name" value="ExitText" />
+			<attribute name="Horiz Alignment" value="Center" />
+			<attribute name="Vert Alignment" value="Center" />
+			<attribute name="Top Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Top Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Is Editable" value="false" />
+			<attribute name="Bring To Front" value="true" />
+			<attribute name="Bring To Back" value="false" />
+			<attribute name="Indent Spacing" value="20" />
+			<attribute name="Font" value="Font;Fonts/BlueHighway.ttf" />
+			<attribute name="Font Size" value="15" />
+			<attribute name="Text" value="EXIT!" />
+			<attribute name="Text Alignment" value="Center" />
+		</element>
+	</element>
+	<element type="Text" style="EditorMenuText">
+		<attribute name="Name" value="InfoText" />
+		<attribute name="Position" value="90 50" />
+		<attribute name="Top Left Color" value="0.85 0.85 0.85 1" />
+		<attribute name="Top Right Color" value="0.85 0.85 0.85 1" />
+		<attribute name="Bottom Left Color" value="0.85 0.85 0.85 1" />
+		<attribute name="Bottom Right Color" value="0.85 0.85 0.85 1" />
+		<attribute name="Text" value="Welcome Back!" />
+	</element>
+</element>

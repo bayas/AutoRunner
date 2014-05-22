@@ -31,7 +31,7 @@
 using namespace Urho3D;
 
 const int CTRL_FORWARD = BIT(0);
-//const int CTRL_BACK = BIT(1);
+const int CTRL_BACK = BIT(1);
 const int CTRL_LEFT = BIT(2);
 const int CTRL_RIGHT = BIT(3);
 const int CTRL_JUMP = BIT(4);
@@ -46,6 +46,7 @@ const float INAIR_THRESHOLD_TIME = 0.1f;
 
 const unsigned int FLOOR_COLLISION_MASK = BIT(1);
 const unsigned int COIN_COLLISION_MASK = BIT(2);
+const unsigned int OBSTACLE_COLLISION_MASK = BIT(3);
 
 enum CharacterSide
 {
@@ -83,7 +84,7 @@ public:
     static void RegisterObject(Context* context);
     
     /// Handle startup. Called by LogicComponent base class. Creates model and loads animations.
-    virtual void Start();
+	virtual void Start();
     /// Handle physics world update. Called by LogicComponent base class.
 	virtual void FixedUpdate(float timeStep);
 	/// Handle scene post-update, Called by LogicCOmponent base class.
@@ -94,6 +95,7 @@ public:
     /// Movement controls. Assigned by the main program each frame.
     Controls controls_;
 
+	void Reset();
 	void FollowPath(float timeStep);
 	bool HasTurnRequest();
 	bool GetCurrentPoint(Vector3& point);
@@ -105,6 +107,7 @@ public:
 	CharacterSide GetSide() { return currentSide_; }
 	unsigned int GetNumPoints() { return runPath_[currentSide_].Size(); }
 	TurnState GetTurnState() { return turnState_; }
+	bool IsDead() { return isDead_; }
 	void SetCurrentPlatform(Node* platform) { currentPlatform_ = platform; }
 
 private:
@@ -127,13 +130,15 @@ private:
 	bool turnRequest_;
 	bool inTrigger_;
 	bool onJumpGround_;
+	bool rolling_;
+	bool isDead_;
 
 	CharacterSide currentSide_;
 	JumpState jumpState_;
 	TurnState turnState_;
 
 	RunPath runPath_;
-	Node* currentPlatform_;
+	WeakPtr<Node> currentPlatform_;
 	PODVector<Node*> passedBlocks_;
 
 };

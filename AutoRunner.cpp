@@ -53,8 +53,10 @@
 #include "PhysicsEvents.h"
 #include "SmoothedTransform.h"
 #include "Log.h"
-#include "DebugNew.h"
 #include "Param.h"
+#include "Menu.h"
+#include "UIEvents.h"
+#include "DebugNew.h"
 
 // Expands to this example's entry-point
 DEFINE_APPLICATION_MAIN(AutoRunner)
@@ -65,7 +67,8 @@ AutoRunner::AutoRunner(Context* context) :
 	yaw_(0.0f),
 	pitch_(0.0f),
 	drawDebug_(false),
-	scoreText_(0)
+	scoreText_(0),
+	isPlaying_(false)
 {
 	Character::RegisterObject(context);
 	SetRandomSeed(Time::GetSystemTime());
@@ -76,28 +79,22 @@ void AutoRunner::Start()
 {
 	// Execute base class startup
 	Sample::Start();
-	
+
 	// Init scene content
 	InitScene();
 
 	// Create Camera
 	CreateCamera();
-
-	// Create the controllable character
-	CreateCharacter();
-
-	// Create overlays
-	CreateOverlays();
-
+	
 	// Subscribe to necessary events
 	SubscribeToEvents();
 
 	// Initialize touch input on Android & iOS
 	if (GetPlatform() == "Android" || GetPlatform() == "iOS")
-	{
-		SetLogoVisible(false);
 		touch_->InitTouchInput();
-	}
+
+	SetLogoVisible(false);
+	CreateUI();
 }
 
 void AutoRunner::InitScene()
@@ -137,7 +134,7 @@ void AutoRunner::CreateCharacter()
 
 	// Create rigidbody, and set non-zero mass so that the body becomes dynamic
 	RigidBody* body = objectNode->CreateComponent<RigidBody>();
-	body->SetCollisionLayer(FLOOR_COLLISION_MASK|COIN_COLLISION_MASK);
+	body->SetCollisionLayer(FLOOR_COLLISION_MASK|COIN_COLLISION_MASK|OBSTACLE_COLLISION_MASK);
 	body->SetMass(1.0f);
 
 	// Set zero angular factor so that physics doesn't turn the character on its own.
@@ -179,7 +176,7 @@ void AutoRunner::CreateOverlays()
 {
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 	UI* ui = GetSubsystem<UI>();
-
+	
 	// Construct new Text object, set string to display and font to use
 	scoreText_ = ui->GetRoot()->CreateChild<Text>();
 	scoreText_->SetText("Score 0");
@@ -209,7 +206,7 @@ void AutoRunner::HandleFixedUpdate(StringHash eventType, VariantMap& eventData)
 {
 	using namespace PhysicsPreStep;
 
-	if (character_) {
+	if (character_ && !character_->IsDead()) {
 		Vector3 currentPoint;
 		if (character_->GetCurrentPoint(currentPoint)) {
 			Vector3 worldPos = character_->GetNode()->GetWorldPosition();
@@ -225,11 +222,14 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 {
 	using namespace Update;
 
-	float timeStep = eventData[P_TIMESTEP].GetFloat();
+	UI* ui = GetSubsystem<UI>();
 	Input* input = GetSubsystem<Input>();
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
+	float timeStep = eventData[P_TIMESTEP].GetFloat();
 
-	if (character_)
+	ui->GetCursor()->SetVisible(!input->GetMouseButtonDown(MOUSEB_RIGHT));
+
+	if (character_ && !character_->IsDead())
 	{
 		// Update path.
 		Vector3 point;
@@ -243,7 +243,7 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 
 		character_->FollowPath(timeStep);
 		// Clear previous controls
-		character_->controls_.Set(CTRL_FORWARD | CTRL_LEFT | CTRL_RIGHT /*| CTRL_BACK */| CTRL_JUMP, false);
+		character_->controls_.Set(CTRL_FORWARD | CTRL_LEFT | CTRL_RIGHT | CTRL_BACK | CTRL_JUMP, false);
 
 		if (touch_->touchEnabled_)
 		{
@@ -253,25 +253,25 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 		else
 		{
 			// Update controls using keys (desktop)
-			UI* ui = GetSubsystem<UI>();
-
-			if (!ui->GetFocusElement())
+			//if (!ui->GetFocusElement())
 			{
-				static bool starting = false;
 				if (input->GetKeyDown('W') || input->GetKeyDown(KEY_UP))
-					starting = true;
+					isPlaying_ = true;
 
-				character_->controls_.Set(CTRL_FORWARD, starting);
+				character_->controls_.Set(CTRL_FORWARD, isPlaying_);
 				character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('A'));
 				character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('D'));
-				//character_->controls_.Set(CTRL_BACK, input->GetKeyDown('S'));
+				character_->controls_.Set(CTRL_BACK, input->GetKeyDown('S'));
 				character_->controls_.Set(CTRL_JUMP, input->GetKeyDown(KEY_SPACE));
 
-				// Add character yaw & pitch from the mouse motion
-				yaw_ += (float)input->GetMouseMoveX() * YAW_SENSITIVITY;
-				pitch_ += (float)input->GetMouseMoveY() * YAW_SENSITIVITY;
-				// Limit pitch
-				pitch_ = Clamp(pitch_, -80.0f, 80.0f);
+				if (!ui->GetCursor()->IsVisible())
+				{
+					// Add character yaw & pitch from the mouse motion
+					yaw_ += (float)input->GetMouseMoveX() * YAW_SENSITIVITY;
+					pitch_ += (float)input->GetMouseMoveY() * YAW_SENSITIVITY;
+					// Limit pitch
+					pitch_ = Clamp(pitch_, -80.0f, 80.0f);
+				}
 
 				// Switch between 1st and 3rd person
 				if (input->GetKeyPress('F'))
@@ -300,6 +300,28 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 {
 	if (!character_)
 		return;
+
+	if (character_->IsDead())
+	{
+		if (!isPlaying_)
+			return;
+
+		String elementName = "InfoText";
+		Text* info = static_cast<Text*>(gameMenu_->GetChild(elementName));
+		info->SetText("You Dead!, Restart or Exit..");
+		info->SetPosition(info->GetPosition().x_ - 30, info->GetPosition().y_);
+		elementName = "PlayBtn";
+		Button* playBtn = static_cast<Button*>(gameMenu_->GetChild(elementName));
+		Text* playText = static_cast<Text*>(playBtn->GetChild(0));
+		playText->SetText("Restart");
+
+		gameMenu_->SetEnabled(true);
+		gameMenu_->SetVisible(true);
+		gameMenu_->SetFocus(true);
+		isPlaying_ = false;
+
+		return;
+	}
 
 	// Update score
 	if (scoreText_)
@@ -353,6 +375,32 @@ void AutoRunner::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventD
 	for (unsigned int i = 0; i < spheres_.Size(); i++)
 	{
 		debug->AddSphere(spheres_[i], Color::RED);
+	}
+}
+
+void AutoRunner::HandleControlClicked(StringHash eventType, VariantMap& eventData)
+{
+	// Get control that was clicked
+	UIElement* clicked = static_cast<UIElement*>(eventData[UIMouseClick::P_ELEMENT].GetPtr());
+
+	if (clicked)
+	{
+		String name = clicked->GetName();
+		if (name == "PlayBtn")
+		{
+			if (character_ && character_->IsDead())
+				ResetGame();
+			else
+				InitGame();
+
+			gameMenu_->SetVisible(false);
+			gameMenu_->SetEnabled(false);
+			gameMenu_->SetFocus(false);
+		}
+		else if (name == "ExitBtn")
+		{
+			engine_->Exit();
+		}
 	}
 }
 
@@ -433,11 +481,14 @@ void AutoRunner::CreateLevel()
 		// Create coins in appropriate slots.
 		Node* slots = blockNode->GetChild("Slots");
 		PODVector<Node*> coinSlots;
+		PODVector<Node*> obstacleSlots;
 		for (unsigned int slotIndex = 0; slotIndex < slots->GetNumChildren(); slotIndex++)
 		{
 			Node* slot = slots->GetChild(slotIndex);
 			if (!slot->GetVar(GameVarirants::P_FITTOCOIN).IsEmpty())
 				coinSlots.Push(slot);
+			if (!slot->GetVar(GameVarirants::P_FITTOOBSTACLE).IsEmpty())
+				obstacleSlots.Push(slot);
 		}
 
 		if (!coinSlots.Empty())
@@ -451,6 +502,23 @@ void AutoRunner::CreateLevel()
 			{
 				Node* coinNode = scene_->InstantiateXML(coinObj->GetRoot(), firstFit->GetWorldPosition(), firstFit->GetWorldRotation());
 				coinNode->SetParent(blockNode);
+			}
+		}
+
+		// Create obstacles in appropriate slots.
+		if (!obstacleSlots.Empty())
+		{
+			int slotSize = obstacleSlots.Size() - 1;
+			int slotIndex = Random(slotSize);
+			Node* firstFit = obstacleSlots[slotIndex];
+			XMLFile* obstacleObj = cache->GetResource<XMLFile>("Objects/Obstacle1.xml");
+
+			if (obstacleObj)
+			{
+				Vector3 pos = firstFit->GetWorldPosition();
+				pos.y_ += 1.0f;
+				Node* obstacleNode = scene_->InstantiateXML(obstacleObj->GetRoot(), pos, firstFit->GetWorldRotation());
+				obstacleNode->SetParent(blockNode);
 			}
 		}
 
@@ -578,4 +646,78 @@ String AutoRunner::GetRandomCoinObjectName()
 		coinObjName = "Objects/CoinBlue.xml";
 
 	return coinObjName;
+}
+
+void AutoRunner::CreateUI()
+{
+	ResourceCache* cache = GetSubsystem<ResourceCache>();
+	UI* ui = GetSubsystem<UI>();
+	UIElement* rootElement = ui->GetRoot();
+
+	// Create a Cursor UI element because we want to be able to hide and show it at will. When hidden, the mouse cursor will
+	// control the camera, and when visible, it will point the raycast target
+	XMLFile* style = cache->GetResource<XMLFile>("UI/DefaultStyle.xml");
+	SharedPtr<Cursor> cursor(new Cursor(context_));
+	cursor->SetStyleAuto(style);
+	ui->SetCursor(cursor);
+	// Set starting position of the cursor at the rendering window center
+	Graphics* graphics = GetSubsystem<Graphics>();
+	cursor->SetPosition(graphics->GetWidth() / 2, graphics->GetHeight() / 2);
+
+	XMLFile* gameMenu = cache->GetResource<XMLFile>("UI/AutoRunnerGameMenu.xml");
+	if (gameMenu)
+	{
+		gameMenu_ = rootElement->CreateChild<Menu>();
+		if (gameMenu_->LoadXML(gameMenu->GetRoot(), style))
+		{
+			gameMenu_->GetName();
+			gameMenu_->SetPosition(300, 300);
+			gameMenu_->SetFocus(true);
+		}
+	}
+
+	// Subscribe also to all UI mouse clicks just to see where we have clicked
+	SubscribeToEvent(E_UIMOUSECLICK, HANDLER(AutoRunner, HandleControlClicked));
+}
+
+void AutoRunner::InitGame()
+{
+	// Create the controllable character
+	CreateCharacter();
+
+	// Create overlays
+	CreateOverlays();
+}
+
+void AutoRunner::ResetGame()
+{
+	// Remove all blocks.
+	for (auto it = blocks_.Begin(); it != blocks_.End(); ++it)
+		(*it)->Remove();
+
+	blocks_.Clear();
+	SetRandomSeed(Time::GetSystemTime());
+	lastOutWorldTransform_ = Matrix3x4(Vector3::ZERO, Quaternion(90, Vector3(0, 1, 0)), 1);
+
+	if (character_)
+	{
+		character_->Reset();
+		character_->GetNode()->SetWorldTransform(Vector3(0.0f, 3.0f, 0.0f), Quaternion::IDENTITY);
+	}
+
+	if (scoreText_)
+		scoreText_->SetText("Score 0");
+
+	// Check the last time if we have any block in current scene.
+	PODVector<Node*> allChildren;
+	scene_->GetChildren(allChildren);
+	for (auto it = allChildren.Begin(); it != allChildren.End(); ++it)
+	{
+		Node* child = *it;
+		if (child->GetName().Contains("Block"))
+			child->Remove();
+	}
+
+	yaw_ = pitch_ = 0.0f;
+	CreateLevel();
 }

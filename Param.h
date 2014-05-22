@@ -9,6 +9,8 @@ namespace GameVarirants
 	PARAM(P_POINT, Point);
 	PARAM(P_OFFSET, Offset);
 	PARAM(P_FITTOCOIN, FitToCoin);
+	PARAM(P_FITTOOBSTACLE, FitToObstacle);
 	PARAM(P_TURNPOINT, TurnPoint);
 	PARAM(P_ISINPLATFORM, IsInPlatform);
+	PARAM(P_ISOBSTACLE, IsObstacle);
 }

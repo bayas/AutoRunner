@@ -52,7 +52,7 @@ void Sample::Setup()
 void Sample::Start()
 {
     // Create logo
-    //CreateLogo();
+    CreateLogo();
 
     // Set custom window Title & Icon
     SetWindowTitleAndIcon();

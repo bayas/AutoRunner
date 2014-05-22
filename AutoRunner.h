@@ -29,6 +29,8 @@ namespace Urho3D
 {
 	class Node;
 	class Scene;
+	class Menu;
+	class Text;
 }
 
 class Character;
@@ -48,6 +50,10 @@ public:
 	virtual void Start();
 
 private:
+	void CreateUI();
+	void InitGame();
+	void ResetGame();
+
 	/// Create static scene content.
 	void InitScene();
 	/// Create controllable character.
@@ -66,6 +72,8 @@ private:
 	void HandlePostUpdate(StringHash eventType, VariantMap& eventData);
 	/// Handle the post-render update event.
 	void HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData);
+	/// Handle any UI control being clicked.
+	void HandleControlClicked(StringHash eventType, VariantMap& eventData);
 
 	/// Scene.
 	SharedPtr<Scene> scene_;
@@ -87,9 +95,11 @@ private:
 	void UpdatePath(bool startIn = true);
 	String GetRandomCoinObjectName();
 
+	bool isPlaying_;
 	List<Node*> blocks_;
 	Matrix3x4 lastOutWorldTransform_;
 	Text* scoreText_;
+	Menu* gameMenu_;
 	Node* characterHead_;
 	PODVector<DebugLine> lines_;
 	PODVector<Sphere> spheres_;

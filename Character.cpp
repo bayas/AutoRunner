@@ -35,6 +35,7 @@
 #include "Ray.h"
 #include "DebugRenderer.h"
 #include "Param.h"
+#include "CollisionShape.h"
 
 namespace Urho3D
 {
@@ -50,6 +51,8 @@ Character::Character(Context* context) :
 	turnRequest_(false),
 	inTrigger_(false),
 	onJumpGround_(false),
+	rolling_(false),
+	isDead_(false),
 	currentPlatform_(0),
 	currentSide_(CharacterSide::CENTER_SIDE),
 	jumpState_(JumpState::STOP_JUMPING),
@@ -109,6 +112,27 @@ void Character::FixedUpdate(float timeStep)
     // Velocity on the XZ plane
     Vector3 planeVelocity(velocity.x_, 0.0f, velocity.z_);
 
+	if (inAirTimer_ > 2.5f)
+		isDead_ = true;
+
+	if (isDead_)
+	{
+		if (!animCtrl->IsPlaying("Models/vempire_death.ani"))
+		{
+			moveDir = Vector3::BACK;
+			body->SetLinearVelocity(Vector3::ZERO);
+			body->ApplyImpulse(rot * moveDir * 5.5f);
+		}
+
+		//LOGDEBUG("Stopping all animations.");
+		animCtrl->StopAll();
+		animCtrl->Play("Models/vempire_death.ani", 0, false);
+		//LOGDEBUG("Playing death.");
+		animCtrl->SetSpeed("Models/vempire_death.ani", 0.3f);
+
+		return;
+	}
+
 	if (controls_.IsDown(CTRL_FORWARD))
 	{
 		moveDir = Vector3::FORWARD;
@@ -133,6 +157,26 @@ void Character::FixedUpdate(float timeStep)
 
 		if (coolDown <= 0 && onGround_)
 			coolDown = .3f;
+	}
+
+	// Adjusting character collision shape.
+	if (!controls_.IsDown(CTRL_BACK) && rolling_)
+	{
+		// Set a capsule shape for collision
+		CollisionShape* shape = node_->GetComponent<CollisionShape>();
+		shape->SetCapsule(0.7f, 1.5f, Vector3(0.0f, 0.8f, 0.0f));
+	}
+
+	if (controls_.IsDown(CTRL_BACK))
+	{
+		rolling_ = true;
+		// Set a capsule shape for collision
+		CollisionShape* shape = node_->GetComponent<CollisionShape>();
+		shape->SetCapsule(0.7f, .6f, Vector3(0.0f, 0.5f, 0.0f));
+	}
+	else
+	{
+		rolling_ = false;
 	}
 
 	if (coolDown <= 0 && !controls_.IsDown(CTRL_LEFT))
@@ -237,10 +281,22 @@ void Character::FixedUpdate(float timeStep)
 	// Play walk animation if moving on ground, otherwise fade it out
 	if (jumpState_ == STOP_JUMPING && softGrounded && !moveDir.Equals(Vector3::ZERO))
 	{
-		//LOGDEBUG("Playing run.");
-		animCtrl->Play("Models/vempire_run.ani", 0, true, 0.2f);
-		// Set walk animation speed proportional to velocity
-		animCtrl->SetSpeed("Models/vempire_run.ani", planeVelocity.Length() * 0.3f);
+		if (rolling_)
+		{
+			//LOGDEBUG("Stopping run.");
+			animCtrl->Stop("Models/vempire_run.ani", 0.2f);
+			//LOGDEBUG("Playing roll.");
+			animCtrl->Play("Models/vempire_roll.ani", 0, true);
+		}
+		else
+		{
+			//LOGDEBUG("Stopping roll.");
+			animCtrl->Stop("Models/vempire_roll.ani");
+			//LOGDEBUG("Playing run.");
+			animCtrl->Play("Models/vempire_run.ani", 0, true, 0.2f);
+			// Set walk animation speed proportional to velocity
+			animCtrl->SetSpeed("Models/vempire_run.ani", planeVelocity.Length() * 0.3f);
+		}
 	}
 	else
 	{
@@ -330,6 +386,13 @@ void Character::HandleNodeCollisionStart(StringHash eventType, VariantMap& event
 
 		currentPlatform_ = enteringPlatform;
 	}
+
+	// Check obstacles.
+	var = otherNode->GetVar(GameVarirants::P_ISOBSTACLE);
+	if (!var.IsEmpty())
+	{
+		isDead_ = true;
+	}
 }
 
 void Character::HandleNodeCollisionEnd(StringHash eventType, VariantMap& eventData)
@@ -414,6 +477,29 @@ void Character::RemoveFirstPoint()
 	runPath_[LEFT_SIDE].PopFront();
 	runPath_[RIGHT_SIDE].PopFront();
 	runPath_[CENTER_SIDE].PopFront();
+}
+
+void Character::Reset()
+{
+	// Remove all way-points and passed blocks.
+	runPath_.Clear();
+	RemovePassedBlocks();
+	if (!currentPlatform_.Expired())
+		currentPlatform_->Remove();
+
+	inAirTimer_ = 0.0f;
+	currentPlatform_ = 0;
+	currentSide_ = CharacterSide::CENTER_SIDE;
+	jumpState_ = JumpState::STOP_JUMPING;
+	turnState_ = TurnState::NO_SUCCEEDED;
+
+	RigidBody* body = GetComponent<RigidBody>();
+	AnimationController* animCtrl = node_->GetChild("PlayerModel")->GetComponent<AnimationController>();
+
+	isDead_ = false;
+	//LOGDEBUG("Stopping death.");
+	animCtrl->Stop("Models/vempire_death.ani");
+	body->SetLinearVelocity(Vector3::ZERO);
 }
 
 void Character::FollowPath(float timeStep)
