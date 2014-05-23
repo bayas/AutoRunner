@@ -213,5 +213,15 @@
 				<variant hash="37211" type="Bool" value="true" />
 			</attribute>
 		</node>
+		<node id="16777602">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Slot" />
+			<attribute name="Position" value="-9 1 0" />
+			<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables">
+				<variant hash="37211" type="Bool" value="true" />
+			</attribute>
+		</node>
 	</node>
 </node>

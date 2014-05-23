@@ -96,6 +96,7 @@ private:
 	String GetRandomCoinObjectName();
 
 	bool isPlaying_;
+	unsigned int numBlocks_;
 	List<Node*> blocks_;
 	Matrix3x4 lastOutWorldTransform_;
 	Text* scoreText_;

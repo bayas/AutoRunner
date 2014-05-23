@@ -68,7 +68,8 @@ AutoRunner::AutoRunner(Context* context) :
 	pitch_(0.0f),
 	drawDebug_(false),
 	scoreText_(0),
-	isPlaying_(false)
+	isPlaying_(false),
+	numBlocks_(0)
 {
 	Character::RegisterObject(context);
 	SetRandomSeed(Time::GetSystemTime());
@@ -255,14 +256,14 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 			// Update controls using keys (desktop)
 			//if (!ui->GetFocusElement())
 			{
-				if (input->GetKeyDown('W') || input->GetKeyDown(KEY_UP))
-					isPlaying_ = true;
+				if (!isPlaying_)
+					isPlaying_ = character_->OnGround();
 
 				character_->controls_.Set(CTRL_FORWARD, isPlaying_);
 				character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('A'));
 				character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('D'));
 				character_->controls_.Set(CTRL_BACK, input->GetKeyDown('S'));
-				character_->controls_.Set(CTRL_JUMP, input->GetKeyDown(KEY_SPACE));
+				character_->controls_.Set(CTRL_JUMP, input->GetKeyDown('W'));
 
 				if (!ui->GetCursor()->IsVisible())
 				{
@@ -309,7 +310,7 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 		String elementName = "InfoText";
 		Text* info = static_cast<Text*>(gameMenu_->GetChild(elementName));
 		info->SetText("You Dead!, Restart or Exit..");
-		info->SetPosition(info->GetPosition().x_ - 30, info->GetPosition().y_);
+		info->SetPosition(60, info->GetPosition().y_);
 		elementName = "PlayBtn";
 		Button* playBtn = static_cast<Button*>(gameMenu_->GetChild(elementName));
 		Text* playText = static_cast<Text*>(playBtn->GetChild(0));
@@ -319,6 +320,7 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 		gameMenu_->SetVisible(true);
 		gameMenu_->SetFocus(true);
 		isPlaying_ = false;
+		numBlocks_ = 0;
 
 		return;
 	}
@@ -491,7 +493,7 @@ void AutoRunner::CreateLevel()
 				obstacleSlots.Push(slot);
 		}
 
-		if (!coinSlots.Empty())
+		if (numBlocks_ > 0 && !coinSlots.Empty())
 		{
 			int slotSize = coinSlots.Size() - 1;
 			int slotIndex = Random(slotSize);
@@ -506,23 +508,29 @@ void AutoRunner::CreateLevel()
 		}
 
 		// Create obstacles in appropriate slots.
-		if (!obstacleSlots.Empty())
+		if (numBlocks_ > 0 && !obstacleSlots.Empty())
 		{
-			int slotSize = obstacleSlots.Size() - 1;
-			int slotIndex = Random(slotSize);
-			Node* firstFit = obstacleSlots[slotIndex];
-			XMLFile* obstacleObj = cache->GetResource<XMLFile>("Objects/Obstacle1.xml");
-
-			if (obstacleObj)
+			//int slotSize = obstacleSlots.Size();
+			//int slotIndex = Urho3D::Clamp(Random(slotSize), 0, slotSize - 1);
+			for (unsigned int slotIndex = 0; slotIndex < obstacleSlots.Size(); slotIndex++)
 			{
-				Vector3 pos = firstFit->GetWorldPosition();
-				pos.y_ += 1.0f;
-				Node* obstacleNode = scene_->InstantiateXML(obstacleObj->GetRoot(), pos, firstFit->GetWorldRotation());
-				obstacleNode->SetParent(blockNode);
+				Node* firstFit = obstacleSlots[slotIndex];
+				XMLFile* obstacleObj = cache->GetResource<XMLFile>("Objects/Obstacle1.xml");
+
+				if (obstacleObj)
+				{
+					Vector3 pos = firstFit->GetWorldPosition();
+					if (firstFit->GetVars().Size() > 1)
+						pos.y_ += 1.0f;
+
+					Node* obstacleNode = scene_->InstantiateXML(obstacleObj->GetRoot(), pos, firstFit->GetWorldRotation());
+					obstacleNode->SetParent(blockNode);
+				}
 			}
 		}
 
 		cnt--;
+		numBlocks_++;
 		blocks_.Push(blockNode);
 
 		// If the last block is the straight then,

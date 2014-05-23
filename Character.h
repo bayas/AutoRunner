@@ -36,11 +36,12 @@ const int CTRL_LEFT = BIT(2);
 const int CTRL_RIGHT = BIT(3);
 const int CTRL_JUMP = BIT(4);
 
-const float MOVE_FORCE = 1.2f;
+const float MOVE_FORCE = 1.3f;
 const float MOVE_SIDE_FORCE = 13.0f;
+const float MOVE_SIDE_AIR_FORCE = 120.0f;
 const float INAIR_MOVE_FORCE = 0.02f;
 const float BRAKE_FORCE = 0.2f;
-const float JUMP_FORCE = 7.0f;
+const float JUMP_FORCE = 5.0f;
 const float YAW_SENSITIVITY = 0.1f;
 const float INAIR_THRESHOLD_TIME = 0.1f;
 
@@ -108,6 +109,7 @@ public:
 	unsigned int GetNumPoints() { return runPath_[currentSide_].Size(); }
 	TurnState GetTurnState() { return turnState_; }
 	bool IsDead() { return isDead_; }
+	bool OnGround() { return onGround_; }
 	void SetCurrentPlatform(Node* platform) { currentPlatform_ = platform; }
 
 private:

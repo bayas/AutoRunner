@@ -112,7 +112,7 @@ void Character::FixedUpdate(float timeStep)
     // Velocity on the XZ plane
     Vector3 planeVelocity(velocity.x_, 0.0f, velocity.z_);
 
-	if (inAirTimer_ > 2.5f)
+	if (inAirTimer_ > 2.0f)
 		isDead_ = true;
 
 	if (isDead_)
@@ -122,11 +122,11 @@ void Character::FixedUpdate(float timeStep)
 			moveDir = Vector3::BACK;
 			body->SetLinearVelocity(Vector3::ZERO);
 			body->ApplyImpulse(rot * moveDir * 5.5f);
+			//LOGDEBUG("Stopping all animations.");
+			animCtrl->StopAll();
 		}
 
-		//LOGDEBUG("Stopping all animations.");
-		animCtrl->StopAll();
-		animCtrl->Play("Models/vempire_death.ani", 0, false);
+		animCtrl->Play("Models/vempire_death.ani", 0, false, 0.2f);
 		//LOGDEBUG("Playing death.");
 		animCtrl->SetSpeed("Models/vempire_death.ani", 0.3f);
 
@@ -145,7 +145,7 @@ void Character::FixedUpdate(float timeStep)
 		if (cntLeft > cntLimit)
 			turnState_ = TurnState::LEFT_SUCCEEDED;
 
-		if (coolDown <= 0 && onGround_)
+		if (coolDown <= 0)
 			coolDown = .3f;
 	}
 
@@ -155,28 +155,27 @@ void Character::FixedUpdate(float timeStep)
 		if (cntRight > cntLimit)
 			turnState_ = TurnState::RIGHT_SUCCEEDED;
 
-		if (coolDown <= 0 && onGround_)
+		if (coolDown <= 0)
 			coolDown = .3f;
-	}
-
-	// Adjusting character collision shape.
-	if (!controls_.IsDown(CTRL_BACK) && rolling_)
-	{
-		// Set a capsule shape for collision
-		CollisionShape* shape = node_->GetComponent<CollisionShape>();
-		shape->SetCapsule(0.7f, 1.5f, Vector3(0.0f, 0.8f, 0.0f));
 	}
 
 	if (controls_.IsDown(CTRL_BACK))
 	{
 		rolling_ = true;
+	}
+
+	// Adjusting character collision shape.
+	if (rolling_ || jumpState_ == LOOP_JUMPING)
+	{
 		// Set a capsule shape for collision
 		CollisionShape* shape = node_->GetComponent<CollisionShape>();
 		shape->SetCapsule(0.7f, .6f, Vector3(0.0f, 0.5f, 0.0f));
 	}
 	else
 	{
-		rolling_ = false;
+		// Set a capsule shape for collision
+		CollisionShape* shape = node_->GetComponent<CollisionShape>();
+		shape->SetCapsule(0.7f, 1.5f, Vector3(0.0f, 0.8f, 0.0f));
 	}
 
 	if (coolDown <= 0 && !controls_.IsDown(CTRL_LEFT))
@@ -196,13 +195,18 @@ void Character::FixedUpdate(float timeStep)
 		if (controls_.IsDown(CTRL_LEFT) && CheckSide(CTRL_LEFT))
 		{
 			moveDir = Vector3::LEFT;
-			body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
+			if (jumpState_ == JumpState::LOOP_JUMPING)
+				body->ApplyForce(rot * moveDir * MOVE_SIDE_AIR_FORCE);
+			else
+				body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
 		}
 
 		if (controls_.IsDown(CTRL_RIGHT) && CheckSide(CTRL_RIGHT))
 		{
 			moveDir = Vector3::RIGHT;
-			if (!inTrigger_)
+			if (jumpState_ == JumpState::LOOP_JUMPING)
+				body->ApplyForce(rot * moveDir * MOVE_SIDE_AIR_FORCE);
+			else
 				body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
 		}
 	}
@@ -222,7 +226,7 @@ void Character::FixedUpdate(float timeStep)
 				okToJump_ = false;
 				//LOGDEBUG("Stopping run.");
 				animCtrl->Stop("Models/vempire_run.ani", 0.2f);
-				animCtrl->Play("Models/vempire_jmpStart.ani", 0, false);
+				animCtrl->Play("Models/vempire_jmpStart.ani", 0, false, 0.2f);
 				//LOGDEBUG("Playing jump start.");
 				jumpState_ = START_JUMPING;
 			}
@@ -246,7 +250,7 @@ void Character::FixedUpdate(float timeStep)
 			{
 				if (jumpState_ == START_JUMPING)
 				{
-					animCtrl->Play("Models/vempire_jmpStart.ani", 0, false);
+					animCtrl->Play("Models/vempire_jmpStart.ani", 0, false, 0.2f);
 					//LOGDEBUG("Playing jump start.");
 				}
 				else if (jumpState_ == LOOP_JUMPING)
@@ -254,25 +258,30 @@ void Character::FixedUpdate(float timeStep)
 					if (animCtrl->IsPlaying("Models/vempire_jmpLoop.ani"))
 					{
 						//LOGDEBUG("Stopping jump loop.");
-						animCtrl->Stop("Models/vempire_jmpLoop.ani");
+						animCtrl->Stop("Models/vempire_jmpLoop.ani", 0.2f);
 					}
 
-					animCtrl->Play("Models/vempire_jmpEnd.ani", 0, false);
+					animCtrl->Play("Models/vempire_jmpEnd.ani", 0, false, 0.2f);
 					//LOGDEBUG("Playing jump end.");
 
 					if (result.distance_ < minDistance)
+					{
+						//LOGDEBUG("Stopping jump loop.");
+						animCtrl->Stop("Models/vempire_jmpLoop.ani", 0.2f);
 						jumpState_ = STOP_JUMPING;
+					}
 				}
 			}
 			else if (jumpState_ == START_JUMPING)
 			{
 				//LOGDEBUG("Stopping jump start.");
-				animCtrl->Stop("Models/vempire_jmpStart.ani");
+				animCtrl->Stop("Models/vempire_jmpStart.ani", 0.2f);
 				jumpState_ = LOOP_JUMPING;
 			}
 			else if (jumpState_ == LOOP_JUMPING)
 			{
-				animCtrl->Play("Models/vempire_jmpLoop.ani", 0, true);
+				animCtrl->Play("Models/vempire_jmpLoop.ani", 0, true, 0.2f);
+				animCtrl->SetSpeed("Models/vempire_jmpLoop.ani", 0.4f);
 				//LOGDEBUG("Playing jump loop.");
 			}
 		}
@@ -286,12 +295,21 @@ void Character::FixedUpdate(float timeStep)
 			//LOGDEBUG("Stopping run.");
 			animCtrl->Stop("Models/vempire_run.ani", 0.2f);
 			//LOGDEBUG("Playing roll.");
-			animCtrl->Play("Models/vempire_roll.ani", 0, true);
+			animCtrl->Play("Models/vempire_roll.ani", 0, false, 0.1f);
+			animCtrl->SetSpeed("Models/vempire_roll.ani", 0.6f);
+
+			float diff = animCtrl->GetLength("Models/vempire_roll.ani") - animCtrl->GetTime("Models/vempire_roll.ani");
+			if (diff == 0)
+			{
+				//LOGDEBUG("Stopping roll.");
+				animCtrl->Stop("Models/vempire_roll.ani", 0.1f);
+				rolling_ = false;
+			}
 		}
 		else
 		{
 			//LOGDEBUG("Stopping roll.");
-			animCtrl->Stop("Models/vempire_roll.ani");
+			animCtrl->Stop("Models/vempire_roll.ani", 0.1f);
 			//LOGDEBUG("Playing run.");
 			animCtrl->Play("Models/vempire_run.ani", 0, true, 0.2f);
 			// Set walk animation speed proportional to velocity
@@ -487,6 +505,8 @@ void Character::Reset()
 	if (!currentPlatform_.Expired())
 		currentPlatform_->Remove();
 
+	isDead_ = false;
+	rolling_ = false;
 	inAirTimer_ = 0.0f;
 	currentPlatform_ = 0;
 	currentSide_ = CharacterSide::CENTER_SIDE;
@@ -496,9 +516,8 @@ void Character::Reset()
 	RigidBody* body = GetComponent<RigidBody>();
 	AnimationController* animCtrl = node_->GetChild("PlayerModel")->GetComponent<AnimationController>();
 
-	isDead_ = false;
-	//LOGDEBUG("Stopping death.");
-	animCtrl->Stop("Models/vempire_death.ani");
+	//LOGDEBUG("Stopping all.");
+	animCtrl->StopAll();
 	body->SetLinearVelocity(Vector3::ZERO);
 }
 
