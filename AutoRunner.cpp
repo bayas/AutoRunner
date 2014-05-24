@@ -49,6 +49,17 @@
 
 #include "AutoRunner.h"
 
+#ifdef ENABLE_ANGELSCRIPT
+#include "ScriptFile.h"
+#include "Script.h"
+#include "ScriptInstance.h"
+#endif
+
+#ifdef ENABLE_LUA
+#include "LuaScript.h"
+#include "LuaScriptInstance.h"
+#endif
+
 #include "XMLFile.h"
 #include "PhysicsEvents.h"
 #include "SmoothedTransform.h"
@@ -78,6 +89,17 @@ AutoRunner::AutoRunner(Context* context) :
 
 void AutoRunner::Start()
 {
+#ifdef ENABLE_ANGELSCRIPT
+	// Instantiate and register the AngelScript subsystem
+	context_->RegisterSubsystem(new Script(context_));
+#endif
+
+#ifdef ENABLE_LUA
+	// Instantiate and register the Lua script subsystem
+	LuaScript* luaScript = new LuaScript(context_);
+	context_->RegisterSubsystem(luaScript);
+#endif
+
 	// Execute base class startup
 	Sample::Start();
 
@@ -94,6 +116,7 @@ void AutoRunner::Start()
 	if (GetPlatform() == "Android" || GetPlatform() == "iOS")
 		touch_->InitTouchInput();
 
+	GetSubsystem<Graphics>()->SetWindowTitle("AutoRunner Kit Game");
 	SetLogoVisible(false);
 	CreateUI();
 }
@@ -207,16 +230,6 @@ void AutoRunner::HandleFixedUpdate(StringHash eventType, VariantMap& eventData)
 {
 	using namespace PhysicsPreStep;
 
-	if (character_ && !character_->IsDead()) {
-		Vector3 currentPoint;
-		if (character_->GetCurrentPoint(currentPoint)) {
-			Vector3 worldPos = character_->GetNode()->GetWorldPosition();
-			currentPoint.y_ = worldPos.y_;
-			float length = (worldPos - currentPoint).Length();
-			if (length <= 1.0f)
-				character_->RemoveFirstPoint();
-		}
-	}
 }
 
 void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
@@ -307,14 +320,36 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 		if (!isPlaying_)
 			return;
 
+		static int highScore = 0;
+
 		String elementName = "InfoText";
-		Text* info = static_cast<Text*>(gameMenu_->GetChild(elementName));
-		info->SetText("You Dead!, Restart or Exit..");
-		info->SetPosition(60, info->GetPosition().y_);
+		Text* infoText = static_cast<Text*>(gameMenu_->GetChild(elementName));
+		infoText->SetText("You Dead!, Restart or Exit..");
+		infoText->SetPosition(60, infoText->GetPosition().y_);
+		elementName = "LastScoreText";
+		Text* lastScoreText = static_cast<Text*>(gameMenu_->GetChild(elementName));
+		lastScoreText->SetVisible(true);
+		lastScoreText->SetText("Score: " + String(character_->GetScore()));
+
+		elementName = "HighScoreText";
+		Text* highScoreText = static_cast<Text*>(gameMenu_->GetChild(elementName));
+		if (highScore < character_->GetScore())
+		{
+			highScore = character_->GetScore();
+			highScoreText->GetChild(0)->SetVisible(true);
+		}
+		else
+		{
+			highScoreText->GetChild(0)->SetVisible(false);
+		}
+
+		highScoreText->SetVisible(true);
+		highScoreText->SetText("High Score: " + String(highScore));
+
 		elementName = "PlayBtn";
 		Button* playBtn = static_cast<Button*>(gameMenu_->GetChild(elementName));
 		Text* playText = static_cast<Text*>(playBtn->GetChild(0));
-		playText->SetText("Restart");
+		playText->SetText("RESTART!");
 
 		gameMenu_->SetEnabled(true);
 		gameMenu_->SetVisible(true);
@@ -410,7 +445,7 @@ void AutoRunner::CreateLevel()
 {
 	int cnt = 3;
 	int maxRecursive = 30;
-	int maxBlockNumber = 4;
+	int maxBlockNumber = 5;
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
 	while (cnt > 0)
@@ -535,7 +570,7 @@ void AutoRunner::CreateLevel()
 
 		// If the last block is the straight then,
 		// Go ahead creating the block until the last block is turned one.
-		if (cnt == 0 && rnd == 1)
+		if (cnt == 0 && (rnd == 1 || rnd == 5))
 		{
 			// TODO: You should check the length of straight path.
 			cnt++;
@@ -682,6 +717,14 @@ void AutoRunner::CreateUI()
 			gameMenu_->SetPosition(300, 300);
 			gameMenu_->SetFocus(true);
 		}
+
+		String elementName = "LastScoreText";
+		Text* lastScoreText = static_cast<Text*>(gameMenu_->GetChild(elementName));
+		lastScoreText->SetVisible(false);
+		elementName = "HighScoreText";
+		Text* highScoreText = static_cast<Text*>(gameMenu_->GetChild(elementName));
+		highScoreText->SetVisible(false);
+		highScoreText->GetChild(0)->SetVisible(false);
 	}
 
 	// Subscribe also to all UI mouse clicks just to see where we have clicked

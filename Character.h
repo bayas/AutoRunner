@@ -28,6 +28,11 @@
 
 #define BIT(x) (1<<(x))
 
+namespace Urho3D
+{
+	class AnimationController;
+}
+
 using namespace Urho3D;
 
 const int CTRL_FORWARD = BIT(0);
@@ -49,6 +54,15 @@ const unsigned int FLOOR_COLLISION_MASK = BIT(1);
 const unsigned int COIN_COLLISION_MASK = BIT(2);
 const unsigned int OBSTACLE_COLLISION_MASK = BIT(3);
 
+const String ANIM_RUN = "Models/vempire_run.ani";
+const String ANIM_ROLL = "Models/vempire_roll.ani";
+const String ANIM_DEATH = "Models/vempire_death.ani";
+const String ANIM_JUMP_END = "Models/vempire_jmpEnd.ani";
+const String ANIM_JUMP_LEFT = "Models/vempire_jmpLeft.ani";
+const String ANIM_JUMP_LOOP = "Models/vempire_jmpLoop.ani";
+const String ANIM_JUMP_START = "Models/vempire_jmpStart.ani";
+const String ANIM_JUMP_RIGHT = "Models/vempire_jmpRight.ani";
+
 enum CharacterSide
 {
 	LEFT_SIDE = 0,
@@ -67,10 +81,12 @@ enum TurnState
 {
 	NO_SUCCEEDED = 0,
 	LEFT_SUCCEEDED,
-	RIGHT_SUCCEEDED
+	RIGHT_SUCCEEDED,
+	SIDE_LEFT_SUCCEEDED,
+	SIDE_RIGHT_SUCCEEDED
 };
 
-typedef HashMap<unsigned int, List<Vector3>> RunPath;
+typedef HashMap<unsigned, List<Vector3>> RunPath;
 
 /// Character component, responsible for physical movement according to controls, as well as animation.
 class Character : public LogicComponent
@@ -127,6 +143,7 @@ private:
 
 	/// Game mechanics.
 	bool CheckSide(int control);
+	bool IsPlayedAnim(const String& name) const;
 
 	int score_;
 	bool turnRequest_;
@@ -135,6 +152,7 @@ private:
 	bool rolling_;
 	bool isDead_;
 
+	AnimationController* animCtrl_;
 	CharacterSide currentSide_;
 	JumpState jumpState_;
 	TurnState turnState_;

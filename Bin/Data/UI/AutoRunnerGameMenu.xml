@@ -7,7 +7,7 @@
 	<element type="Button">
 		<attribute name="Name" value="PlayBtn" />
 		<attribute name="Position" value="80 0" />
-		<attribute name="Size" value="50 20" />
+		<attribute name="Size" value="70 22" />
 		<attribute name="Vert Alignment" value="Center" />
 		<element type="Text">
 			<attribute name="Name" value="PlayText" />
@@ -30,7 +30,7 @@
 	<element type="Button">
 		<attribute name="Name" value="ExitBtn" />
 		<attribute name="Position" value="160 0" />
-		<attribute name="Size" value="50 20" />
+		<attribute name="Size" value="70 22" />
 		<attribute name="Vert Alignment" value="Center" />
 		<element type="Text">
 			<attribute name="Name" value="ExitText" />
@@ -58,5 +58,51 @@
 		<attribute name="Bottom Left Color" value="0.85 0.85 0.85 1" />
 		<attribute name="Bottom Right Color" value="0.85 0.85 0.85 1" />
 		<attribute name="Text" value="Welcome Back!" />
+		<element type="Text" style="EditorMenuText">
+			<attribute name="Name" value="InfoText" />
+			<attribute name="Position" value="-70 80" />
+			<attribute name="Top Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Top Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Left Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Bottom Right Color" value="0.85 0.85 0.85 1" />
+			<attribute name="Is Visible" value="false" />
+			<attribute name="Text" value="Press Any Key To Play or Restart!" />
+		</element>
+	</element>
+	<element type="Text" style="EditorMenuText">
+		<attribute name="Name" value="LastScoreText" />
+		<attribute name="Position" value="90 30" />
+		<attribute name="Color" value="0.85 1 0 1" />
+		<attribute name="Top Left Color" value="0.85 1 0 1" />
+		<attribute name="Top Right Color" value="0.85 1 0 1" />
+		<attribute name="Bottom Left Color" value="0.85 1 0 1" />
+		<attribute name="Bottom Right Color" value="0.85 1 0 1" />
+		<attribute name="Font Size" value="13" />
+		<attribute name="Text" value="Score: 0" />
+		<attribute name="Text Effect" value="Stroke" />
+	</element>
+	<element type="Text" style="EditorMenuText">
+		<attribute name="Name" value="HighScoreText" />
+		<attribute name="Position" value="5 150" />
+		<attribute name="Color" value="0.85 1 0 1" />
+		<attribute name="Top Left Color" value="0.85 1 0 1" />
+		<attribute name="Top Right Color" value="0.85 1 0 1" />
+		<attribute name="Bottom Left Color" value="0.85 1 0 1" />
+		<attribute name="Bottom Right Color" value="0.85 1 0 1" />
+		<attribute name="Font Size" value="13" />
+		<attribute name="Text" value="High Score: 0" />
+		<attribute name="Text Effect" value="Stroke" />
+		<element type="Text" style="EditorMenuText">
+			<attribute name="Name" value="CongratText" />
+			<attribute name="Position" value="0 20" />
+			<attribute name="Color" value="0.85 1 0 1" />
+			<attribute name="Top Left Color" value="0.85 1 0 1" />
+			<attribute name="Top Right Color" value="0.85 1 0 1" />
+			<attribute name="Bottom Left Color" value="0.85 1 0 1" />
+			<attribute name="Bottom Right Color" value="0.85 1 0 1" />
+			<attribute name="Font Size" value="13" />
+			<attribute name="Text" value="Congratulations! New High Score." />
+			<attribute name="Text Effect" value="Stroke" />
+		</element>
 	</element>
 </element>

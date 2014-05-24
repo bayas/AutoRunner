@@ -50,10 +50,6 @@ public:
 	virtual void Start();
 
 private:
-	void CreateUI();
-	void InitGame();
-	void ResetGame();
-
 	/// Create static scene content.
 	void InitScene();
 	/// Create controllable character.
@@ -91,6 +87,9 @@ private:
 	bool drawDebug_;
 
 	/// Game mechanics.
+	void CreateUI();
+	void InitGame();
+	void ResetGame();
 	void CreateLevel();
 	void UpdatePath(bool startIn = true);
 	String GetRandomCoinObjectName();

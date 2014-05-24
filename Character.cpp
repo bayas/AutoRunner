@@ -77,10 +77,12 @@ void Character::RegisterObject(Context* context)
 
 void Character::Start()
 {
-    // Component has been inserted into its scene node. Subscribe to events now
+	// Component has been inserted into its scene node. Subscribe to events now
 	SubscribeToEvent(GetNode(), E_NODECOLLISION, HANDLER(Character, HandleNodeCollision));
 	SubscribeToEvent(GetNode(), E_NODECOLLISIONSTART, HANDLER(Character, HandleNodeCollisionStart));
 	SubscribeToEvent(GetNode(), E_NODECOLLISIONEND, HANDLER(Character, HandleNodeCollisionEnd));
+
+	animCtrl_ = GetNode()->GetChild("PlayerModel")->GetComponent<AnimationController>();
 }
 
 void Character::FixedUpdate(float timeStep)
@@ -95,7 +97,6 @@ void Character::FixedUpdate(float timeStep)
 
     /// \todo Could cache the components for faster access instead of finding them each frame
     RigidBody* body = GetComponent<RigidBody>();
-    AnimationController* animCtrl = node_->GetChild("PlayerModel")->GetComponent<AnimationController>();
     
     // Update the in air timer. Reset if grounded
     if (!onGround_)
@@ -106,7 +107,7 @@ void Character::FixedUpdate(float timeStep)
     bool softGrounded = inAirTimer_ < INAIR_THRESHOLD_TIME;
     
     // Update movement & animation
-    const Quaternion& rot = node_->GetRotation();
+    const Quaternion& rot = GetNode()->GetRotation();
     Vector3 moveDir = Vector3::ZERO;
     const Vector3& velocity = body->GetLinearVelocity();
     // Velocity on the XZ plane
@@ -117,20 +118,37 @@ void Character::FixedUpdate(float timeStep)
 
 	if (isDead_)
 	{
-		if (!animCtrl->IsPlaying("Models/vempire_death.ani"))
+		if (!animCtrl_->IsPlaying(ANIM_DEATH))
 		{
 			moveDir = Vector3::BACK;
 			body->SetLinearVelocity(Vector3::ZERO);
 			body->ApplyImpulse(rot * moveDir * 5.5f);
 			//LOGDEBUG("Stopping all animations.");
-			animCtrl->StopAll();
+			animCtrl_->StopAll();
 		}
 
-		animCtrl->Play("Models/vempire_death.ani", 0, false, 0.2f);
+		animCtrl_->Play(ANIM_DEATH, 0, false, 0.2f);
 		//LOGDEBUG("Playing death.");
-		animCtrl->SetSpeed("Models/vempire_death.ani", 0.3f);
+		animCtrl_->SetSpeed(ANIM_DEATH, 0.3f);
 
 		return;
+	}
+	else
+	{
+		// Remove closed points by character.
+		auto it = runPath_.Find(CharacterSide::CENTER_SIDE);
+		for (auto it = runPath_.Begin(); it != runPath_.End(); ++it)
+		{
+			if (it->second_.Size() > 0)
+			{
+				Vector3 currentPoint = it->second_.Front();
+				Vector3 worldPos = GetNode()->GetWorldPosition();
+				currentPoint.y_ = worldPos.y_;
+				float length = (worldPos - currentPoint).Length();
+				if (length <= 1.0f)
+					RemoveFirstPoint();
+			}
+		}
 	}
 
 	if (controls_.IsDown(CTRL_FORWARD))
@@ -160,22 +178,20 @@ void Character::FixedUpdate(float timeStep)
 	}
 
 	if (controls_.IsDown(CTRL_BACK))
-	{
 		rolling_ = true;
-	}
 
-	// Adjusting character collision shape.
+	// Adjusting character collision shape's size and position each movement state.
 	if (rolling_ || jumpState_ == LOOP_JUMPING)
 	{
-		// Set a capsule shape for collision
-		CollisionShape* shape = node_->GetComponent<CollisionShape>();
-		shape->SetCapsule(0.7f, .6f, Vector3(0.0f, 0.5f, 0.0f));
+		CollisionShape* shape = GetNode()->GetComponent<CollisionShape>();
+		shape->SetSize(Vector3(0.7f, 0.6f, 0.7f));
+		shape->SetPosition(Vector3(0.0f, 0.5f, 0.0f));
 	}
 	else
 	{
-		// Set a capsule shape for collision
-		CollisionShape* shape = node_->GetComponent<CollisionShape>();
-		shape->SetCapsule(0.7f, 1.5f, Vector3(0.0f, 0.8f, 0.0f));
+		CollisionShape* shape = GetNode()->GetComponent<CollisionShape>();
+		shape->SetSize(Vector3(0.7f, 1.5f, 0.7f));
+		shape->SetPosition(Vector3(0.0f, 0.8f, 0.0f));
 	}
 
 	if (coolDown <= 0 && !controls_.IsDown(CTRL_LEFT))
@@ -195,6 +211,8 @@ void Character::FixedUpdate(float timeStep)
 		if (controls_.IsDown(CTRL_LEFT) && CheckSide(CTRL_LEFT))
 		{
 			moveDir = Vector3::LEFT;
+			turnState_ = TurnState::SIDE_LEFT_SUCCEEDED;
+
 			if (jumpState_ == JumpState::LOOP_JUMPING)
 				body->ApplyForce(rot * moveDir * MOVE_SIDE_AIR_FORCE);
 			else
@@ -204,6 +222,8 @@ void Character::FixedUpdate(float timeStep)
 		if (controls_.IsDown(CTRL_RIGHT) && CheckSide(CTRL_RIGHT))
 		{
 			moveDir = Vector3::RIGHT;
+			turnState_ = TurnState::SIDE_RIGHT_SUCCEEDED;
+
 			if (jumpState_ == JumpState::LOOP_JUMPING)
 				body->ApplyForce(rot * moveDir * MOVE_SIDE_AIR_FORCE);
 			else
@@ -225,8 +245,8 @@ void Character::FixedUpdate(float timeStep)
 				body->ApplyImpulse(Vector3::UP * JUMP_FORCE);
 				okToJump_ = false;
 				//LOGDEBUG("Stopping run.");
-				animCtrl->Stop("Models/vempire_run.ani", 0.2f);
-				animCtrl->Play("Models/vempire_jmpStart.ani", 0, false, 0.2f);
+				animCtrl_->Stop(ANIM_RUN, 0.2f);
+				animCtrl_->Play(ANIM_JUMP_START, 0, false, 0.2f);
 				//LOGDEBUG("Playing jump start.");
 				jumpState_ = START_JUMPING;
 			}
@@ -242,32 +262,33 @@ void Character::FixedUpdate(float timeStep)
 		float minJmpLoop = 0.4f;
 		float minDistance = 0.1f;
 		PhysicsRaycastResult result;
-		Ray ray(node_->GetWorldPosition(), Vector3::DOWN);
-		node_->GetScene()->GetComponent<PhysicsWorld>()->RaycastSingle(result, ray, 100.0f, FLOOR_COLLISION_MASK);
+		Ray ray(GetNode()->GetWorldPosition(), Vector3::DOWN);
+		GetNode()->GetScene()->GetComponent<PhysicsWorld>()->RaycastSingle(result, ray, 100.0f, FLOOR_COLLISION_MASK);
 		if (result.body_)
 		{
+			LOGDEBUG("Jump distance from floor: " + String(result.distance_));
 			if (result.distance_ < minJmpLoop)
 			{
 				if (jumpState_ == START_JUMPING)
 				{
-					animCtrl->Play("Models/vempire_jmpStart.ani", 0, false, 0.2f);
+					animCtrl_->Play(ANIM_JUMP_START, 0, false, 0.2f);
 					//LOGDEBUG("Playing jump start.");
 				}
 				else if (jumpState_ == LOOP_JUMPING)
 				{
-					if (animCtrl->IsPlaying("Models/vempire_jmpLoop.ani"))
+					if (animCtrl_->IsPlaying(ANIM_JUMP_LOOP))
 					{
 						//LOGDEBUG("Stopping jump loop.");
-						animCtrl->Stop("Models/vempire_jmpLoop.ani", 0.2f);
+						animCtrl_->Stop(ANIM_JUMP_LOOP, 0.2f);
 					}
 
-					animCtrl->Play("Models/vempire_jmpEnd.ani", 0, false, 0.2f);
+					animCtrl_->Play(ANIM_JUMP_END, 0, false, 0.2f);
 					//LOGDEBUG("Playing jump end.");
 
 					if (result.distance_ < minDistance)
 					{
 						//LOGDEBUG("Stopping jump loop.");
-						animCtrl->Stop("Models/vempire_jmpLoop.ani", 0.2f);
+						animCtrl_->Stop(ANIM_JUMP_LOOP, 0.2f);
 						jumpState_ = STOP_JUMPING;
 					}
 				}
@@ -275,14 +296,43 @@ void Character::FixedUpdate(float timeStep)
 			else if (jumpState_ == START_JUMPING)
 			{
 				//LOGDEBUG("Stopping jump start.");
-				animCtrl->Stop("Models/vempire_jmpStart.ani", 0.2f);
+				animCtrl_->Stop(ANIM_JUMP_START, 0.2f);
 				jumpState_ = LOOP_JUMPING;
 			}
 			else if (jumpState_ == LOOP_JUMPING)
 			{
-				animCtrl->Play("Models/vempire_jmpLoop.ani", 0, true, 0.2f);
-				animCtrl->SetSpeed("Models/vempire_jmpLoop.ani", 0.4f);
-				//LOGDEBUG("Playing jump loop.");
+				if (turnState_ == SIDE_LEFT_SUCCEEDED)
+				{
+					//LOGDEBUG("Stopping jump loop.");
+					animCtrl_->Stop(ANIM_JUMP_LOOP, 0.2f);
+					//LOGDEBUG("Playing jump left.");
+					animCtrl_->Play(ANIM_JUMP_LEFT, 0, false, 0.2f);
+				}
+				else if (turnState_ == SIDE_RIGHT_SUCCEEDED)
+				{
+					//LOGDEBUG("Stopping jump loop.");
+					animCtrl_->Stop(ANIM_JUMP_LOOP, 0.2f);
+					//LOGDEBUG("Playing jump right.");
+					animCtrl_->Play(ANIM_JUMP_RIGHT, 0, false, 0.2f);
+				}
+				else
+				{
+					if (IsPlayedAnim(ANIM_JUMP_LEFT))
+					{
+						//LOGDEBUG("Stopping jump left.");
+						animCtrl_->Stop(ANIM_JUMP_LEFT, 0.1f);
+					}
+
+					if (IsPlayedAnim(ANIM_JUMP_RIGHT))
+					{
+						//LOGDEBUG("Stopping jump right.");
+						animCtrl_->Stop(ANIM_JUMP_RIGHT, 0.1f);
+					}
+
+					animCtrl_->Play(ANIM_JUMP_LOOP, 0, true, 0.2f);
+					animCtrl_->SetSpeed(ANIM_JUMP_LOOP, 0.4f);
+					//LOGDEBUG("Playing jump loop.");
+				}
 			}
 		}
 	}
@@ -293,32 +343,31 @@ void Character::FixedUpdate(float timeStep)
 		if (rolling_)
 		{
 			//LOGDEBUG("Stopping run.");
-			animCtrl->Stop("Models/vempire_run.ani", 0.2f);
+			animCtrl_->Stop(ANIM_RUN, 0.2f);
 			//LOGDEBUG("Playing roll.");
-			animCtrl->Play("Models/vempire_roll.ani", 0, false, 0.1f);
-			animCtrl->SetSpeed("Models/vempire_roll.ani", 0.6f);
+			animCtrl_->Play(ANIM_ROLL, 0, false, 0.1f);
+			animCtrl_->SetSpeed(ANIM_ROLL, 0.6f);
 
-			float diff = animCtrl->GetLength("Models/vempire_roll.ani") - animCtrl->GetTime("Models/vempire_roll.ani");
-			if (diff == 0)
+			if (IsPlayedAnim(ANIM_ROLL))
 			{
 				//LOGDEBUG("Stopping roll.");
-				animCtrl->Stop("Models/vempire_roll.ani", 0.1f);
+				animCtrl_->Stop(ANIM_ROLL, 0.1f);
 				rolling_ = false;
 			}
 		}
 		else
 		{
 			//LOGDEBUG("Stopping roll.");
-			animCtrl->Stop("Models/vempire_roll.ani", 0.1f);
+			animCtrl_->Stop(ANIM_ROLL, 0.1f);
 			//LOGDEBUG("Playing run.");
-			animCtrl->Play("Models/vempire_run.ani", 0, true, 0.2f);
+			animCtrl_->Play(ANIM_RUN, 0, true, 0.2f);
 			// Set walk animation speed proportional to velocity
-			animCtrl->SetSpeed("Models/vempire_run.ani", planeVelocity.Length() * 0.3f);
+			animCtrl_->SetSpeed(ANIM_RUN, planeVelocity.Length() * 0.3f);
 		}
 	}
 	else
 	{
-		animCtrl->Stop("Models/vempire_run.ani", 0.2f);
+		animCtrl_->Stop(ANIM_RUN, 0.2f);
 	}
 
 	// Reset grounded flag for next frame
@@ -327,7 +376,7 @@ void Character::FixedUpdate(float timeStep)
 
 void Character::PostUpdate(float timeStep)
 {
-	//LOGDEBUG("Character Node Scale: " + node_->GetWorldScale().ToString());
+	//LOGDEBUG("Character Node Scale: " + GetNode()->GetWorldScale().ToString());
 	return;
 }
 
@@ -367,7 +416,7 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
         float contactImpulse = contacts.ReadFloat();
 
         // If contact is below node center and mostly vertical, assume it's a ground contact
-        if (contactPosition.y_ < (node_->GetPosition().y_ + 1.0f))
+        if (contactPosition.y_ < (GetNode()->GetPosition().y_ + 1.0f))
         {
 			float level = Abs(contactNormal.y_);
             if (level > 0.75)
@@ -482,7 +531,7 @@ void Character::AddToPath(CharacterSide side, const List<Vector3>& points)
 
 bool Character::GetCurrentPoint(Vector3& point)
 {
-	auto it = runPath_.Find((unsigned int)currentSide_);
+	auto it = runPath_.Find(currentSide_);
 	if (it->second_.Size() == 0)
 		return false;
 
@@ -507,6 +556,9 @@ void Character::Reset()
 
 	isDead_ = false;
 	rolling_ = false;
+	turnRequest_ = false;
+	inTrigger_ = false;
+	score_ = 0;
 	inAirTimer_ = 0.0f;
 	currentPlatform_ = 0;
 	currentSide_ = CharacterSide::CENTER_SIDE;
@@ -514,10 +566,9 @@ void Character::Reset()
 	turnState_ = TurnState::NO_SUCCEEDED;
 
 	RigidBody* body = GetComponent<RigidBody>();
-	AnimationController* animCtrl = node_->GetChild("PlayerModel")->GetComponent<AnimationController>();
 
 	//LOGDEBUG("Stopping all.");
-	animCtrl->StopAll();
+	animCtrl_->StopAll();
 	body->SetLinearVelocity(Vector3::ZERO);
 }
 
@@ -525,11 +576,11 @@ void Character::FollowPath(float timeStep)
 {
 	Vector3 nextWaypoint = Vector3::ZERO; 
 	if (GetCurrentPoint(nextWaypoint)) {
-		nextWaypoint.y_ = node_->GetWorldPosition().y_;
-		Vector3 targetPos = nextWaypoint - node_->GetWorldPosition();
+		nextWaypoint.y_ = GetNode()->GetWorldPosition().y_;
+		Vector3 targetPos = nextWaypoint - GetNode()->GetWorldPosition();
 		Quaternion targetRotation;
 		targetRotation.FromLookRotation(targetPos);
-		SmoothedTransform* smooth = node_->GetComponent<SmoothedTransform>();
+		SmoothedTransform* smooth = GetNode()->GetComponent<SmoothedTransform>();
 		float yaw = targetRotation.YawAngle();
 		float minYaw = -178.0f;
 		float maxYaw = 178.0f;
@@ -541,10 +592,10 @@ void Character::FollowPath(float timeStep)
 
 		if (!targetRotation.IsNaN() && yaw)
 		{
-			//targetRotation = node_->GetParent()->GetWorldRotation().Inverse() * targetRotation;
-			//node_->SetRotation(targetRotation);
+			//targetRotation = GetNode()->GetParent()->GetWorldRotation().Inverse() * targetRotation;
+			//GetNode()->SetRotation(targetRotation);
 			smooth->SetTargetWorldRotation(targetRotation);
-			//node_->LookAt(nextWaypoint);
+			//GetNode()->LookAt(nextWaypoint);
 		}
 	}
 }
@@ -575,4 +626,17 @@ void Character::RemovePassedBlocks()
 		(*it)->Remove();
 
 	passedBlocks_.Clear();
+}
+
+bool Character::IsPlayedAnim(const String& name) const
+{
+	bool played = false;
+
+	if (animCtrl_->IsPlaying(name))
+	{
+		float diff = animCtrl_->GetLength(name) - animCtrl_->GetTime(name);
+		played = (diff == 0);
+	}
+
+	return played;
 }
