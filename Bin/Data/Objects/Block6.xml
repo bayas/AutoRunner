@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
-<node id="16777608">
+<node id="16777635">
 	<attribute name="Is Enabled" value="true" />
-	<attribute name="Name" value="Block5" />
-	<attribute name="Position" value="30 0 2.71447" />
+	<attribute name="Name" value="Block6" />
+	<attribute name="Position" value="30 0 -32.5026" />
 	<attribute name="Rotation" value="1 0 0 0" />
 	<attribute name="Scale" value="1 1 1" />
 	<attribute name="Variables">
 		<variant hash="6725" type="Int" value="1" />
 		<variant hash="54830" type="Int" value="0" />
 	</attribute>
-	<node id="16777609">
+	<node id="16777636">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="In" />
 		<attribute name="Position" value="10 0 0" />
@@ -19,7 +19,7 @@
 			<variant hash="16659" type="Vector3" value="-10 0 0" />
 		</attribute>
 	</node>
-	<node id="16777610">
+	<node id="16777637">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Out" />
 		<attribute name="Position" value="-10 0 0" />
@@ -27,21 +27,21 @@
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
 	</node>
-	<node id="16777611">
+	<node id="16777638">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Paths" />
 		<attribute name="Position" value="0 0.5 0" />
 		<attribute name="Rotation" value="1 0 0 0" />
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
-		<node id="16777612">
+		<node id="16777639">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="CenterIn" />
 			<attribute name="Position" value="0 0.5 0" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
-			<node id="16777613">
+			<node id="16777640">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="5 0 0" />
@@ -49,7 +49,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 			</node>
-			<node id="16777614">
+			<node id="16777641">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="0 0 0" />
@@ -57,7 +57,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 			</node>
-			<node id="16777615">
+			<node id="16777642">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="-5 0 0" />
@@ -65,7 +65,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 			</node>
-			<node id="16777616">
+			<node id="16777643">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="-10 0 0" />
@@ -74,14 +74,14 @@
 				<attribute name="Variables" />
 			</node>
 		</node>
-		<node id="16777617">
+		<node id="16777644">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="LeftIn" />
 			<attribute name="Position" value="0 0.5 -1.2" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
-			<node id="16777618">
+			<node id="16777645">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="5 0 0" />
@@ -89,7 +89,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 			</node>
-			<node id="16777619">
+			<node id="16777646">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="0 0 0" />
@@ -97,7 +97,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 			</node>
-			<node id="16777620">
+			<node id="16777647">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="-5 0 0" />
@@ -105,7 +105,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 			</node>
-			<node id="16777621">
+			<node id="16777648">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="-10 0 0" />
@@ -114,14 +114,14 @@
 				<attribute name="Variables" />
 			</node>
 		</node>
-		<node id="16777622">
+		<node id="16777649">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="RightIn" />
 			<attribute name="Position" value="0 0.5 1.2" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
-			<node id="16777623">
+			<node id="16777650">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="5 0 0" />
@@ -129,7 +129,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 			</node>
-			<node id="16777624">
+			<node id="16777651">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="0 0 0" />
@@ -137,7 +137,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 			</node>
-			<node id="16777625">
+			<node id="16777652">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="-5 0 0" />
@@ -145,7 +145,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 			</node>
-			<node id="16777626">
+			<node id="16777653">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="-10 0 0" />
@@ -155,177 +155,167 @@
 			</node>
 		</node>
 	</node>
-	<node id="16777627">
+	<node id="16777654">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Slots" />
 		<attribute name="Position" value="0 0 0" />
 		<attribute name="Rotation" value="1 0 0 0" />
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
-		<node id="16777628">
+		<node id="16777655">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Slot" />
-			<attribute name="Position" value="5 1 0.936653" />
+			<attribute name="Position" value="-0.591059 1 1.43424" />
 			<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables">
 				<variant hash="32061" type="Bool" value="true" />
 			</attribute>
 		</node>
-		<node id="16777629">
+		<node id="16777656">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Slot" />
-			<attribute name="Position" value="-5.88774 1 -0.895422" />
+			<attribute name="Position" value="0.248297 1 0" />
 			<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables">
 				<variant hash="32061" type="Bool" value="true" />
 			</attribute>
 		</node>
-		<node id="16777630">
+		<node id="16777657">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Slot" />
-			<attribute name="Position" value="1.85611 1 0.0103685" />
+			<attribute name="Position" value="6.2037 1 1.51791" />
 			<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables">
 				<variant hash="32061" type="Bool" value="true" />
 			</attribute>
 		</node>
-		<node id="16777631">
+		<node id="16777658">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Slot" />
-			<attribute name="Position" value="-9 1 0" />
+			<attribute name="Position" value="-5.23993 1 0" />
 			<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
 			<attribute name="Scale" value="1 1 1" />
-			<attribute name="Variables" />
+			<attribute name="Variables">
+				<variant hash="37211" type="Bool" value="true" />
+			</attribute>
 		</node>
 	</node>
-	<node id="16777632">
+	<node id="16777659">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Floors" />
 		<attribute name="Position" value="0 0 0" />
 		<attribute name="Rotation" value="1 0 0 0" />
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
-		<node id="71">
+		<node id="73">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Floor" />
-			<attribute name="Position" value="6.5 0 0" />
+			<attribute name="Position" value="0 0 -1.5" />
 			<attribute name="Rotation" value="1 0 0 0" />
-			<attribute name="Scale" value="7 1 4" />
+			<attribute name="Scale" value="20 1 1" />
 			<attribute name="Variables">
 				<variant hash="6754" type="Bool" value="true" />
 			</attribute>
-			<component type="StaticModel" id="227">
+			<component type="StaticModel" id="233">
 				<attribute name="Model" value="Model;Models/Box.mdl" />
 				<attribute name="Material" value="Material;Materials/StoneTiledBlock.xml" />
 			</component>
-			<component type="CollisionShape" id="228" />
-			<component type="RigidBody" id="229">
-				<attribute name="Physics Position" value="36.5 0 2.71447" />
+			<component type="CollisionShape" id="234" />
+			<component type="RigidBody" id="235">
+				<attribute name="Physics Position" value="30 0 -34.0026" />
 				<attribute name="Collision Layer" value="2" />
 				<attribute name="Collision Mask" value="2" />
 			</component>
-			<component type="CollisionShape" id="270">
-				<attribute name="Offset Position" value="0 1.5 0.7" />
-				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
-			</component>
-			<component type="CollisionShape" id="271">
-				<attribute name="Offset Position" value="0 1.5 -0.7" />
-				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
+			<component type="CollisionShape" id="276">
+				<attribute name="Size" value="1 4 1" />
+				<attribute name="Offset Position" value="0 1.5 -1.2" />
 			</component>
 		</node>
-		<node id="70">
+		<node id="75">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Floor" />
-			<attribute name="Position" value="-6.5 0 0" />
+			<attribute name="Position" value="0 0 1.5" />
 			<attribute name="Rotation" value="1 0 0 0" />
-			<attribute name="Scale" value="7 1 4" />
+			<attribute name="Scale" value="20 1 1" />
 			<attribute name="Variables">
 				<variant hash="6754" type="Bool" value="true" />
 			</attribute>
-			<component type="StaticModel" id="224">
+			<component type="StaticModel" id="239">
 				<attribute name="Model" value="Model;Models/Box.mdl" />
 				<attribute name="Material" value="Material;Materials/StoneTiledBlock.xml" />
 			</component>
-			<component type="CollisionShape" id="225" />
-			<component type="RigidBody" id="226">
-				<attribute name="Physics Position" value="23.5 0 2.71447" />
+			<component type="CollisionShape" id="240" />
+			<component type="RigidBody" id="241">
+				<attribute name="Physics Position" value="30 0 -31.0026" />
 				<attribute name="Collision Layer" value="2" />
 				<attribute name="Collision Mask" value="2" />
 			</component>
-			<component type="CollisionShape" id="272">
-				<attribute name="Offset Position" value="0 1.5 0.7" />
-				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
-			</component>
-			<component type="CollisionShape" id="273">
-				<attribute name="Offset Position" value="0 1.5 -0.7" />
-				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
+			<component type="CollisionShape" id="277">
+				<attribute name="Size" value="1 4 1" />
+				<attribute name="Offset Position" value="0 1.5 1.2" />
 			</component>
 		</node>
-		<node id="72">
+		<node id="76">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Floor" />
 			<attribute name="Position" value="0 0 0" />
 			<attribute name="Rotation" value="1 0 0 0" />
-			<attribute name="Scale" value="6 1 4" />
+			<attribute name="Scale" value="4 1 2" />
 			<attribute name="Variables">
 				<variant hash="6754" type="Bool" value="true" />
 			</attribute>
-			<component type="CollisionShape" id="231" />
-			<component type="RigidBody" id="232">
-				<attribute name="Physics Position" value="30 0 2.71447" />
+			<component type="StaticModel" id="242">
+				<attribute name="Model" value="Model;Models/Box.mdl" />
+				<attribute name="Material" value="Material;Materials/StoneTiledBlock.xml" />
+			</component>
+			<component type="CollisionShape" id="243" />
+			<component type="RigidBody" id="244">
+				<attribute name="Physics Position" value="30 0 -32.5026" />
+				<attribute name="Friction" value="0.9" />
 				<attribute name="Collision Layer" value="2" />
 				<attribute name="Collision Mask" value="2" />
-				<attribute name="Is Trigger" value="true" />
-			</component>
-			<component type="CollisionShape" id="274">
-				<attribute name="Offset Position" value="0 1.5 0.7" />
-				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
-			</component>
-			<component type="CollisionShape" id="275">
-				<attribute name="Offset Position" value="0 1.5 -0.7" />
-				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
 			</component>
 		</node>
-		<node id="16777633">
+		<node id="16777660">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Smooke" />
-			<attribute name="Position" value="1.90735e-006 -0.855083 0" />
-			<attribute name="Rotation" value="0.99158 0.000785951 -0.0575344 -0.116005" />
+			<attribute name="Position" value="5.64577 -0.683482 0" />
+			<attribute name="Rotation" value="0.991581 0.000785951 -0.0575344 -0.116005" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
-			<component type="BillboardSet" id="16777236">
+			<component type="BillboardSet" id="16777239">
 				<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
 				<attribute name="Sort By Distance" value="true" />
 				<attribute name="Billboards">
 					<variant type="Int" value="5" />
-					<variant type="Vector3" value="2 0 0" />
+					<variant type="Vector3" value="3 0 0" />
 					<variant type="Vector2" value="2.3 2.3" />
 					<variant type="Vector4" value="0 0 1 1" />
 					<variant type="Color" value="1 1 1 1" />
 					<variant type="Float" value="20" />
 					<variant type="Bool" value="true" />
-					<variant type="Vector3" value="-2 0 0" />
+					<variant type="Vector3" value="-3 0 0" />
 					<variant type="Vector2" value="3 2" />
 					<variant type="Vector4" value="0 0 1 1" />
 					<variant type="Color" value="1 1 1 1" />
 					<variant type="Float" value="45" />
 					<variant type="Bool" value="true" />
-					<variant type="Vector3" value="0 0 -2" />
+					<variant type="Vector3" value="3 0 -1" />
 					<variant type="Vector2" value="3 2.5" />
 					<variant type="Vector4" value="0 0 1 1" />
 					<variant type="Color" value="1 1 1 1" />
 					<variant type="Float" value="90" />
 					<variant type="Bool" value="true" />
-					<variant type="Vector3" value="0 0 2" />
+					<variant type="Vector3" value="-3 -1 1" />
 					<variant type="Vector2" value="1.9 2.3" />
 					<variant type="Vector4" value="0 0 1 1" />
 					<variant type="Color" value="1 1 1 1" />
-					<variant type="Float" value="78" />
+					<variant type="Float" value="90" />
 					<variant type="Bool" value="true" />
-					<variant type="Vector3" value="0 -2 0" />
+					<variant type="Vector3" value="0 -1 0" />
 					<variant type="Vector2" value="3 3" />
 					<variant type="Vector4" value="0 0 1 1" />
 					<variant type="Color" value="1 1 1 1" />
@@ -333,25 +323,123 @@
 					<variant type="Bool" value="true" />
 				</attribute>
 			</component>
-			<component type="ScriptInstance" id="16777238">
+			<component type="ScriptInstance" id="16777240">
 				<attribute name="Delayed Method Calls" value="0" />
 				<attribute name="Script File" value="ScriptFile;Scripts/Rotator.as" />
 				<attribute name="Class Name" value="Rotator" />
 				<attribute name="rotationSpeed" value="10 10 10" />
 			</component>
-			<node id="16777634">
+			<node id="16777661">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="" />
 				<attribute name="Position" value="0 0 0" />
 				<attribute name="Rotation" value="1 0 0 0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="Light" id="16777237">
+				<component type="Light" id="16777241">
 					<attribute name="Color" value="1 0 0 1" />
 					<attribute name="Brightness Multiplier" value="0.3" />
 					<attribute name="Light Shape Texture" value="TextureCube;" />
 				</component>
 			</node>
+		</node>
+		<node id="16777662">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Smooke" />
+			<attribute name="Position" value="-5.80003 -0.783539 0" />
+			<attribute name="Rotation" value="0.991581 0.000785951 -0.0575344 -0.116005" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="BillboardSet" id="16777242">
+				<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
+				<attribute name="Sort By Distance" value="true" />
+				<attribute name="Billboards">
+					<variant type="Int" value="5" />
+					<variant type="Vector3" value="3 0 0" />
+					<variant type="Vector2" value="2.3 2.3" />
+					<variant type="Vector4" value="0 0 1 1" />
+					<variant type="Color" value="1 1 1 1" />
+					<variant type="Float" value="20" />
+					<variant type="Bool" value="true" />
+					<variant type="Vector3" value="-3 0 0" />
+					<variant type="Vector2" value="3 2" />
+					<variant type="Vector4" value="0 0 1 1" />
+					<variant type="Color" value="1 1 1 1" />
+					<variant type="Float" value="45" />
+					<variant type="Bool" value="true" />
+					<variant type="Vector3" value="3 0 -1" />
+					<variant type="Vector2" value="3 2.5" />
+					<variant type="Vector4" value="0 0 1 1" />
+					<variant type="Color" value="1 1 1 1" />
+					<variant type="Float" value="90" />
+					<variant type="Bool" value="true" />
+					<variant type="Vector3" value="-3 -1 1" />
+					<variant type="Vector2" value="1.9 2.3" />
+					<variant type="Vector4" value="0 0 1 1" />
+					<variant type="Color" value="1 1 1 1" />
+					<variant type="Float" value="90" />
+					<variant type="Bool" value="true" />
+					<variant type="Vector3" value="0 -1 0" />
+					<variant type="Vector2" value="3 3" />
+					<variant type="Vector4" value="0 0 1 1" />
+					<variant type="Color" value="1 1 1 1" />
+					<variant type="Float" value="180" />
+					<variant type="Bool" value="true" />
+				</attribute>
+			</component>
+			<component type="ScriptInstance" id="16777243">
+				<attribute name="Delayed Method Calls" value="0" />
+				<attribute name="Script File" value="ScriptFile;Scripts/Rotator.as" />
+				<attribute name="Class Name" value="Rotator" />
+				<attribute name="rotationSpeed" value="10 10 10" />
+			</component>
+			<node id="16777663">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="" />
+				<attribute name="Position" value="0 0 0" />
+				<attribute name="Rotation" value="1 0 0 0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="Light" id="16777244">
+					<attribute name="Color" value="1 0 0 1" />
+					<attribute name="Brightness Multiplier" value="0.3" />
+					<attribute name="Light Shape Texture" value="TextureCube;" />
+				</component>
+			</node>
+		</node>
+		<node id="77">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Floor" />
+			<attribute name="Position" value="6 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="8 1 2" />
+			<attribute name="Variables">
+				<variant hash="6754" type="Bool" value="true" />
+			</attribute>
+			<component type="CollisionShape" id="246" />
+			<component type="RigidBody" id="247">
+				<attribute name="Physics Position" value="36 0 -32.5026" />
+				<attribute name="Collision Layer" value="2" />
+				<attribute name="Collision Mask" value="2" />
+				<attribute name="Is Trigger" value="true" />
+			</component>
+		</node>
+		<node id="79">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Floor" />
+			<attribute name="Position" value="-6 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="8 1 2" />
+			<attribute name="Variables">
+				<variant hash="6754" type="Bool" value="true" />
+			</attribute>
+			<component type="CollisionShape" id="251" />
+			<component type="RigidBody" id="252">
+				<attribute name="Physics Position" value="24 0 -32.5026" />
+				<attribute name="Collision Layer" value="2" />
+				<attribute name="Collision Mask" value="2" />
+				<attribute name="Is Trigger" value="true" />
+			</component>
 		</node>
 	</node>
 </node>

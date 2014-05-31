@@ -67,6 +67,8 @@
 #include "Param.h"
 #include "Menu.h"
 #include "UIEvents.h"
+#include "Console.h"
+#include "Profiler.h"
 #include "DebugNew.h"
 
 // Expands to this example's entry-point
@@ -75,16 +77,26 @@ DEFINE_APPLICATION_MAIN(AutoRunner)
 AutoRunner::AutoRunner(Context* context) :
 	Sample(context),
 	touch_(new Touch(context)),
-	yaw_(0.0f),
-	pitch_(0.0f),
 	drawDebug_(false),
-	scoreText_(0),
 	isPlaying_(false),
+	useMouseMove_(false),
 	numBlocks_(0)
 {
 	Character::RegisterObject(context);
-	SetRandomSeed(Time::GetSystemTime());
-	lastOutWorldTransform_ = Matrix3x4(Vector3::ZERO, Quaternion(90, Vector3(0, 1, 0)), 1);
+}
+
+void AutoRunner::Setup()
+{
+	Sample::Setup();
+	/*// On Android and iOS, read command line from a file as parameters can not otherwise be easily given
+#if defined(ANDROID) || defined(IOS)
+	engineParameters_["FullScreen"]  = true;
+	engineParameters_["Headless"]    = false;
+	// Reparse engine startup parameters now
+	engineParameters_ = Engine::ParseParameters(GetArguments());
+#else
+	Sample::Setup();
+#endif*/
 }
 
 void AutoRunner::Start()
@@ -108,17 +120,33 @@ void AutoRunner::Start()
 
 	// Create Camera
 	CreateCamera();
-	
-	// Subscribe to necessary events
-	SubscribeToEvents();
+
+	// Create overlays
+	CreateOverlays();
 
 	// Initialize touch input on Android & iOS
 	if (GetPlatform() == "Android" || GetPlatform() == "iOS")
+	{
 		touch_->InitTouchInput();
+		// Pass knowledge of the scene & camera node to the Touch helper object.
+		touch_->scene_ = scene_;
+		touch_->cameraNode_ = cameraNode_;
+		useMouseMove_ = false;
+	}
 
+	// Subscribe to necessary events
+	SubscribeToEvents();
+
+	GetSubsystem<Console>()->Toggle();
+	GetSubsystem<Console>()->SetFocusOnShow(false);
 	GetSubsystem<Graphics>()->SetWindowTitle("AutoRunner Kit Game");
 	SetLogoVisible(false);
 	CreateUI();
+}
+
+void AutoRunner::Stop()
+{
+	ResetGame();
 }
 
 void AutoRunner::InitScene()
@@ -130,21 +158,35 @@ void AutoRunner::InitScene()
 	File loadFile(context_, fs->GetProgramDir() + "Data/Scenes/AutoRunner.xml", FILE_READ);
 	scene_->LoadXML(loadFile);
 
-	// Pass knowledge of the scene & camera node to the Touch helper object.
-	touch_->scene_ = scene_;
-	touch_->cameraNode_ = cameraNode_;
+	String platform = GetPlatform();
+	if (platform == "Android" || platform == "iOS" || platform == "Raspberry Pi")
+	{
+		Renderer* renderer = GetSubsystem<Renderer>(); 
+		renderer->SetReuseShadowMaps(false);
+		renderer->SetShadowQuality(SHADOWQUALITY_LOW_16BIT);
+		// Adjust the directional light shadow range slightly further, as only the first
+		// cascade is supported
+		Node* sunNode = scene_->GetChild("Sun1");
+		Light* sun1 = sunNode->GetComponent<Light>();
+		sun1->SetShadowCascade(CascadeParameters(15.0f, 0.0f, 0.0f, 0.0f, 0.9f));
+		sun1->SetShadowIntensity(0.333f);
+		sunNode = scene_->GetChild("Sun2");
+		Light* sun2 = sunNode->GetComponent<Light>();
+		sun2->SetShadowCascade(CascadeParameters(15.0f, 0.0f, 0.0f, 0.0f, 0.9f));
+		sun2->SetShadowIntensity(0.333f);
+	}
 }
 
 void AutoRunner::CreateCharacter()
 {
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
-
+	// Create root node of player
 	Node* objectNode = scene_->CreateChild("Player");
 	objectNode->SetPosition(Vector3(0.0f, 3.0f, 0.0f));
+	// Create model node
 	Node* modelNode = objectNode->CreateChild("PlayerModel");
 	modelNode->SetScale(Vector3(.4f, .4f, .4f));
 	modelNode->SetRotation(Quaternion(180, Vector3::UP));
-
 	// Create the rendering component + animation controller
 	AnimatedModel* object = modelNode->CreateComponent<AnimatedModel>();
 	object->SetModel(cache->GetResource<Model>("Models/vempire.mdl"));
@@ -181,9 +223,6 @@ void AutoRunner::CreateCharacter()
 
 	// Add smoothed transform component.
 	objectNode->CreateComponent<SmoothedTransform>();
-
-	// Create initial level and update the follow-path.
-	CreateLevel();
 }
 
 void AutoRunner::CreateCamera()
@@ -192,6 +231,15 @@ void AutoRunner::CreateCamera()
 	cameraNode_->SetPosition(Vector3(0.0f, 3.0f, -5.0f));
 	Camera* camera = cameraNode_->CreateComponent<Camera>();
 	camera->SetFarClip(300.0f);
+	// Create zone in the camera node
+	Node* zoneNode = scene_->CreateChild("Zone");
+	zoneNode->SetParent(cameraNode_);
+	Zone* zone = zoneNode->CreateComponent<Zone>();
+	zone->SetBoundingBox(BoundingBox(-10, 10));
+	zone->SetFogEnd(30);
+	zone->SetFogStart(10);
+	zone->SetFogColor(Color(0.1f, 0.2f, 0.3f));
+	zone->SetAmbientColor(Color(0.05f, 0.1f, 0.15f));
 
 	GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
 }
@@ -224,6 +272,9 @@ void AutoRunner::SubscribeToEvents()
 
 	// Subscribe HandlePostRenderUpdate() function for processing the post-render update event, during which we request debug geometry
 	SubscribeToEvent(E_POSTRENDERUPDATE, HANDLER(AutoRunner, HandlePostRenderUpdate));
+
+	if (touch_->touchEnabled_)
+		touch_->SubscribeToTouchEvents();
 }
 
 void AutoRunner::HandleFixedUpdate(StringHash eventType, VariantMap& eventData)
@@ -241,7 +292,8 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 	float timeStep = eventData[P_TIMESTEP].GetFloat();
 
-	ui->GetCursor()->SetVisible(!input->GetMouseButtonDown(MOUSEB_RIGHT));
+	if (useMouseMove_)
+		ui->GetCursor()->SetVisible(!input->GetMouseButtonDown(MOUSEB_RIGHT));
 
 	if (character_ && !character_->IsDead())
 	{
@@ -259,6 +311,9 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 		// Clear previous controls
 		character_->controls_.Set(CTRL_FORWARD | CTRL_LEFT | CTRL_RIGHT | CTRL_BACK | CTRL_JUMP, false);
 
+		if (!isPlaying_)
+			isPlaying_ = character_->OnGround();
+
 		if (touch_->touchEnabled_)
 		{
 			// Update controls using touch (mobile)
@@ -269,16 +324,13 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 			// Update controls using keys (desktop)
 			//if (!ui->GetFocusElement())
 			{
-				if (!isPlaying_)
-					isPlaying_ = character_->OnGround();
-
 				character_->controls_.Set(CTRL_FORWARD, isPlaying_);
 				character_->controls_.Set(CTRL_LEFT, input->GetKeyDown('A'));
 				character_->controls_.Set(CTRL_RIGHT, input->GetKeyDown('D'));
 				character_->controls_.Set(CTRL_BACK, input->GetKeyDown('S'));
 				character_->controls_.Set(CTRL_JUMP, input->GetKeyDown('W'));
 
-				if (!ui->GetCursor()->IsVisible())
+				if (useMouseMove_)
 				{
 					// Add character yaw & pitch from the mouse motion
 					yaw_ += (float)input->GetMouseMoveX() * YAW_SENSITIVITY;
@@ -308,6 +360,17 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 		else
 			cam->SetFillMode(FILL_WIREFRAME);
 	}
+
+	// Toggle using mouse pitch_ and yaw_ for camera.
+	if (input->GetKeyPress(KEY_C))
+		useMouseMove_ = !useMouseMove_;
+
+	// Toggle zone mode.
+	if (input->GetKeyPress(KEY_Z))
+	{
+		Node* zoneNode = cameraNode_->GetChild("Zone");
+		zoneNode->SetEnabled(!zoneNode->IsEnabled());
+	}
 }
 
 void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
@@ -321,6 +384,9 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 			return;
 
 		static int highScore = 0;
+
+		if (!touch_->touchEnabled_)
+			GetSubsystem<UI>()->GetCursor()->SetVisible(true);
 
 		String elementName = "InfoText";
 		Text* infoText = static_cast<Text*>(gameMenu_->GetChild(elementName));
@@ -361,13 +427,25 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 	}
 
 	// Update score
-	if (scoreText_)
-		scoreText_->SetText("Score " + (String)character_->GetScore());
+	scoreText_->SetText("Score " + String(character_->GetScore()));
 
 	Node* characterNode = character_->GetNode();
 	// Get camera lookat dir from character yaw + pitch
-	Quaternion rot = Quaternion(yaw_, Vector3::UP);
-	Quaternion dir = rot * Quaternion(pitch_, Vector3::RIGHT);
+	float yawAngle = 0;
+	float pitchAngle = 0;
+	if (useMouseMove_)
+	{
+		yawAngle = yaw_;
+		pitchAngle = pitch_;
+	}
+	else
+	{
+		yawAngle = character_->controls_.yaw_;
+		pitchAngle = character_->controls_.pitch_;
+	}
+
+	Quaternion rot = Quaternion(yawAngle, Vector3::UP);
+	Quaternion dir = rot * Quaternion(pitchAngle, Vector3::RIGHT);
 
 	if (touch_->firstPerson_)
 	{
@@ -377,7 +455,7 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 	else
 	{
 		// Third person camera: position behind the character
-		Vector3 aimPoint = characterNode->GetPosition() + rot * Vector3(0.0f, 1.7f, 0.0f);
+		Vector3 aimPoint = characterNode->GetPosition() + rot * Vector3(0.0f, 2.3f, -1.5f);
 
 		// Collide camera ray with static physics objects (layer bitmask 2) to ensure we see the character properly
 		Vector3 rayDir = dir * Vector3::BACK;
@@ -427,12 +505,13 @@ void AutoRunner::HandleControlClicked(StringHash eventType, VariantMap& eventDat
 		{
 			if (character_ && character_->IsDead())
 				ResetGame();
-			else
-				InitGame();
 
+			InitGame();
 			gameMenu_->SetVisible(false);
 			gameMenu_->SetEnabled(false);
 			gameMenu_->SetFocus(false);
+			if (!touch_->touchEnabled_)
+				GetSubsystem<UI>()->GetCursor()->SetVisible(false);
 		}
 		else if (name == "ExitBtn")
 		{
@@ -445,7 +524,7 @@ void AutoRunner::CreateLevel()
 {
 	int cnt = 3;
 	int maxRecursive = 30;
-	int maxBlockNumber = 5;
+	int maxBlockNumber = 7;
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
 	while (cnt > 0)
@@ -455,6 +534,12 @@ void AutoRunner::CreateLevel()
 
 		// Initial transform has been given from out node.
 		int rnd = Random(maxBlockNumber) + 1;
+		// Set the starting platform.
+		if (numBlocks_ == 0)
+			rnd = 1;
+		else if (rnd == 1 || rnd == 7 || rnd == 6)
+			rnd = 5;
+
 		String prefabName = "Objects/Block" + String(rnd) + ".xml";
 		SharedPtr<File> fBlock1 = cache->GetFile(prefabName);
 		Node* blockNode = scene_->InstantiateXML(*fBlock1, blockPos, blockRot);
@@ -570,7 +655,7 @@ void AutoRunner::CreateLevel()
 
 		// If the last block is the straight then,
 		// Go ahead creating the block until the last block is turned one.
-		if (cnt == 0 && (rnd == 1 || rnd == 5))
+		if (cnt == 0 && (rnd == 1 || rnd == 5 || rnd == 6))
 		{
 			// TODO: You should check the length of straight path.
 			cnt++;
@@ -604,10 +689,10 @@ void AutoRunner::UpdatePath(bool startIn)
 		if (outs >= 2 && !startIn)
 		{
 			TurnState lastState = character_->GetTurnState();
-			if (lastState == TurnState::NO_SUCCEEDED)
+			if (lastState == NO_SUCCEEDED)
 				return;
 
-			if (lastState == TurnState::LEFT_SUCCEEDED)
+			if (lastState == LEFT_SUCCEEDED)
 			{
 				posix += "L";
 			}
@@ -671,9 +756,9 @@ void AutoRunner::UpdatePath(bool startIn)
 		blocks_.PopFront();
 	}
 
-	character_->AddToPath(CharacterSide::LEFT_SIDE, leftPoints);
-	character_->AddToPath(CharacterSide::RIGHT_SIDE, rightPoints);
-	character_->AddToPath(CharacterSide::CENTER_SIDE, centerPoints);
+	character_->AddToPath(LEFT_SIDE, leftPoints);
+	character_->AddToPath(RIGHT_SIDE, rightPoints);
+	character_->AddToPath(CENTER_SIDE, centerPoints);
 }
 
 String AutoRunner::GetRandomCoinObjectName()
@@ -700,12 +785,16 @@ void AutoRunner::CreateUI()
 	// Create a Cursor UI element because we want to be able to hide and show it at will. When hidden, the mouse cursor will
 	// control the camera, and when visible, it will point the raycast target
 	XMLFile* style = cache->GetResource<XMLFile>("UI/DefaultStyle.xml");
-	SharedPtr<Cursor> cursor(new Cursor(context_));
-	cursor->SetStyleAuto(style);
-	ui->SetCursor(cursor);
-	// Set starting position of the cursor at the rendering window center
-	Graphics* graphics = GetSubsystem<Graphics>();
-	cursor->SetPosition(graphics->GetWidth() / 2, graphics->GetHeight() / 2);
+
+	if (!touch_->touchEnabled_)
+	{
+		SharedPtr<Cursor> cursor(new Cursor(context_));
+		cursor->SetStyleAuto(style);
+		ui->SetCursor(cursor);
+		// Set starting position of the cursor at the rendering window center
+		Graphics* graphics = GetSubsystem<Graphics>();
+		cursor->SetPosition(graphics->GetWidth() / 2, graphics->GetHeight() / 2);
+	}
 
 	XMLFile* gameMenu = cache->GetResource<XMLFile>("UI/AutoRunnerGameMenu.xml");
 	if (gameMenu)
@@ -713,8 +802,11 @@ void AutoRunner::CreateUI()
 		gameMenu_ = rootElement->CreateChild<Menu>();
 		if (gameMenu_->LoadXML(gameMenu->GetRoot(), style))
 		{
-			gameMenu_->GetName();
-			gameMenu_->SetPosition(300, 300);
+			Graphics* graphics = GetSubsystem<Graphics>();
+			IntVector2 menuSize = gameMenu_->GetSize();
+			int height = (int)(graphics->GetHeight() - menuSize.y_) / 2;
+			int width = (int)(graphics->GetWidth() - menuSize.x_) / 2;
+			gameMenu_->SetPosition(width, height);
 			gameMenu_->SetFocus(true);
 		}
 
@@ -736,39 +828,36 @@ void AutoRunner::InitGame()
 	// Create the controllable character
 	CreateCharacter();
 
-	// Create overlays
-	CreateOverlays();
+	// Set initial parameters
+	lastOutWorldTransform_ = Matrix3x4(Vector3(0.0f, 0.0f, -2.0f), Quaternion(90, Vector3(0, 1, 0)), 1);
+	yaw_ = pitch_ = 0.0f;
+	scoreText_->SetText("Score 0");
+
+	// Set random seed according to the system time
+	SetRandomSeed(Time::GetSystemTime());
+
+	// Create level
+	CreateLevel();
 }
 
 void AutoRunner::ResetGame()
 {
-	// Remove all blocks.
-	for (auto it = blocks_.Begin(); it != blocks_.End(); ++it)
-		(*it)->Remove();
+	if (!character_)
+		return;
 
-	blocks_.Clear();
-	SetRandomSeed(Time::GetSystemTime());
-	lastOutWorldTransform_ = Matrix3x4(Vector3::ZERO, Quaternion(90, Vector3(0, 1, 0)), 1);
-
-	if (character_)
-	{
-		character_->Reset();
-		character_->GetNode()->SetWorldTransform(Vector3(0.0f, 3.0f, 0.0f), Quaternion::IDENTITY);
-	}
-
-	if (scoreText_)
-		scoreText_->SetText("Score 0");
-
+	// Remove character.
+	Node* characterNode = character_->GetNode();
+	characterNode->RemoveComponent(character_);
+	characterNode->Remove();
 	// Check the last time if we have any block in current scene.
 	PODVector<Node*> allChildren;
 	scene_->GetChildren(allChildren);
-	for (auto it = allChildren.Begin(); it != allChildren.End(); ++it)
+	for (PODVector<Node*>::Iterator it = allChildren.Begin(); it != allChildren.End(); ++it)
 	{
 		Node* child = *it;
 		if (child->GetName().Contains("Block"))
 			child->Remove();
 	}
-
-	yaw_ = pitch_ = 0.0f;
-	CreateLevel();
+	// Remove all blocks.
+	blocks_.Clear();
 }

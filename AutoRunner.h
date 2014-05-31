@@ -36,8 +36,6 @@ namespace Urho3D
 class Character;
 class Touch;
 
-typedef PODVector<Pair<Node*, Node*>> SeperatePath;
-
 class AutoRunner : public Sample
 {
 	OBJECT(AutoRunner);
@@ -46,8 +44,12 @@ public:
 	/// Construct.
 	AutoRunner(Context* context);
 
+	/// Setup before engine initialization. Modifies the engine parameters.
+	virtual void Setup();
 	/// Setup after engine initialization and before running the main loop.
 	virtual void Start();
+	/// Stop after engine exit.
+	virtual void Stop();
 
 private:
 	/// Create static scene content.
@@ -85,6 +87,8 @@ private:
 	float pitch_;
 	/// Flag for drawing debug geometry.
 	bool drawDebug_;
+	/// Using camera look at rotation by using mouse move flag.
+	bool useMouseMove_;
 
 	/// Game mechanics.
 	void CreateUI();

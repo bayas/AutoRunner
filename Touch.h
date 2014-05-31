@@ -32,6 +32,7 @@ namespace Urho3D
     class Controls;
     class Node;
     class Scene;
+	class IntVector2;
 }
 
 const float TOUCH_SENSITIVITY = 5.0f;
@@ -76,16 +77,18 @@ public:
     /// Handle finger touch begin.
     void HandleTouchBegin(StringHash eventType, VariantMap& eventData);
     /// Handle finger touch end.
-    void HandleTouchEnd(StringHash eventType, VariantMap& eventData);
+	void HandleTouchEnd(StringHash eventType, VariantMap& eventData);
+	/// Handle finger touch end.
+	void HandleTouchMove(StringHash eventType, VariantMap& eventData);
 
     /// Scene. Needs to be assigned by the application.
     WeakPtr<Scene> scene_;
     /// Camera node. Needs to be assigned by the application.
     WeakPtr<Node> cameraNode_;
     /// On-screen gamepad move button (left side.)
-    WeakPtr<BorderImage> moveButton_;
+    //WeakPtr<BorderImage> moveButton_;
     /// On-screen gamepad fire/jump button (right side.)
-    WeakPtr<BorderImage> fireButton_;
+    //WeakPtr<BorderImage> fireButton_;
     /// Size of gamepad buttons.
     int touchButtonSize_;
     /// Distance of gamepad buttons from the screen corners.
@@ -93,9 +96,9 @@ public:
     /// Current ID of the move touch, or -1 for none.
     int moveTouchID_;
     /// Current ID of the rotate touch, or -1 for none.
-    int rotateTouchID_;
+    //int rotateTouchID_;
     /// Current ID of the fire/jump touch, or -1 for none.
-    int fireTouchID_;
+    //int fireTouchID_;
     /// Current camera zoom distance.
     float cameraDistance_;
     /// Current first person mode flag.
@@ -108,5 +111,14 @@ public:
     bool zoom_;
     /// Touch input initialized flag.
     bool touchEnabled_;
+
+	/// Game mechanics.
+	bool touchMoved_;
+	IntVector2 deltaXY_;
+	IntVector2 endTouch_;
+	IntVector2 beginTouch_;
+	PODVector<IntVector2> moveTouches_;
+	unsigned int touchCount_;
+
 };
 

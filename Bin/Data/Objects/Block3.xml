@@ -29,47 +29,6 @@
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
 	</node>
-	<node id="51">
-		<attribute name="Is Enabled" value="true" />
-		<attribute name="Name" value="Floor" />
-		<attribute name="Position" value="2 0 0" />
-		<attribute name="Rotation" value="1 0 0 0" />
-		<attribute name="Scale" value="16 1 4" />
-		<attribute name="Variables">
-			<variant hash="6754" type="Bool" value="true" />
-		</attribute>
-		<component type="StaticModel" id="160">
-			<attribute name="Model" value="Model;Models/Box.mdl" />
-			<attribute name="Material" value="Material;Materials/StoneTiledBlock.xml" />
-		</component>
-		<component type="CollisionShape" id="161" />
-		<component type="RigidBody" id="162">
-			<attribute name="Physics Position" value="32 0 -10" />
-			<attribute name="Collision Layer" value="2" />
-			<attribute name="Collision Mask" value="2" />
-		</component>
-	</node>
-	<node id="52">
-		<attribute name="Is Enabled" value="true" />
-		<attribute name="Name" value="Floor" />
-		<attribute name="Position" value="-8.00001 0 -8.00001" />
-		<attribute name="Rotation" value="0.707107 0 0.707107 0" />
-		<attribute name="Scale" value="20 1 4" />
-		<attribute name="Variables">
-			<variant hash="6754" type="Bool" value="true" />
-		</attribute>
-		<component type="StaticModel" id="164">
-			<attribute name="Model" value="Model;Models/Box.mdl" />
-			<attribute name="Material" value="Material;Materials/StoneTiledBlock.xml" />
-		</component>
-		<component type="CollisionShape" id="165" />
-		<component type="RigidBody" id="166">
-			<attribute name="Physics Rotation" value="0.707107 0 0.707107 0" />
-			<attribute name="Physics Position" value="22 0 -18" />
-			<attribute name="Collision Layer" value="2" />
-			<attribute name="Collision Mask" value="2" />
-		</component>
-	</node>
 	<node id="16777309">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Paths" />
@@ -297,7 +256,7 @@
 	<node id="16777519">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="TurnTrigger" />
-		<attribute name="Position" value="-8 2.5 0" />
+		<attribute name="Position" value="-8 2.5 -0.5" />
 		<attribute name="Rotation" value="1 0 0 0" />
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables">
@@ -308,7 +267,7 @@
 			<attribute name="Model" value="Model;Models/Sphere.mdl" />
 		</component>
 		<component type="RigidBody" id="16777228">
-			<attribute name="Physics Position" value="22 2.5 -10" />
+			<attribute name="Physics Position" value="22 2.5 -10.5" />
 			<attribute name="Is Trigger" value="true" />
 		</component>
 	</node>
@@ -359,6 +318,74 @@
 			<attribute name="Variables">
 				<variant hash="37211" type="Bool" value="true" />
 			</attribute>
+		</node>
+	</node>
+	<node id="16777665">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Floors" />
+		<attribute name="Position" value="0 0 0" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<node id="52">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Floor" />
+			<attribute name="Position" value="-8.00001 0 -8.00001" />
+			<attribute name="Rotation" value="0.707107 0 0.707107 0" />
+			<attribute name="Scale" value="20 1 4" />
+			<attribute name="Variables">
+				<variant hash="6754" type="Bool" value="true" />
+			</attribute>
+			<component type="StaticModel" id="164">
+				<attribute name="Model" value="Model;Models/Box.mdl" />
+				<attribute name="Material" value="Material;Materials/StoneTiledBlock.xml" />
+			</component>
+			<component type="CollisionShape" id="165" />
+			<component type="RigidBody" id="166">
+				<attribute name="Physics Rotation" value="0.707107 0 0.707107 0" />
+				<attribute name="Physics Position" value="22 0 -18" />
+				<attribute name="Collision Layer" value="2" />
+				<attribute name="Collision Mask" value="2" />
+			</component>
+			<component type="CollisionShape" id="260">
+				<attribute name="Size" value="0.75 1 1" />
+				<attribute name="Offset Position" value="0.12 1.5 0.7" />
+				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
+			</component>
+			<component type="CollisionShape" id="261">
+				<attribute name="Size" value="0.8 1 1" />
+				<attribute name="Offset Position" value="0.1 1.5 -0.7" />
+				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
+			</component>
+		</node>
+		<node id="51">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Floor" />
+			<attribute name="Position" value="2 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="16 1 4" />
+			<attribute name="Variables">
+				<variant hash="6754" type="Bool" value="true" />
+			</attribute>
+			<component type="StaticModel" id="160">
+				<attribute name="Model" value="Model;Models/Box.mdl" />
+				<attribute name="Material" value="Material;Materials/StoneTiledBlock.xml" />
+			</component>
+			<component type="CollisionShape" id="161" />
+			<component type="RigidBody" id="162">
+				<attribute name="Physics Position" value="32 0 -10" />
+				<attribute name="Collision Layer" value="2" />
+				<attribute name="Collision Mask" value="2" />
+			</component>
+			<component type="CollisionShape" id="262">
+				<attribute name="Offset Position" value="0 1.5 0.7" />
+				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
+			</component>
+			<component type="CollisionShape" id="263">
+				<attribute name="Size" value="0.95 1 1" />
+				<attribute name="Offset Position" value="0.02 1.5 -0.7" />
+				<attribute name="Offset Rotation" value="0.707107 0.707107 0 0" />
+			</component>
 		</node>
 	</node>
 </node>

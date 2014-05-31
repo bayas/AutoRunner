@@ -86,7 +86,7 @@ enum TurnState
 	SIDE_RIGHT_SUCCEEDED
 };
 
-typedef HashMap<unsigned, List<Vector3>> RunPath;
+typedef HashMap<unsigned, List<Vector3> > RunPath;
 
 /// Character component, responsible for physical movement according to controls, as well as animation.
 class Character : public LogicComponent
@@ -94,15 +94,19 @@ class Character : public LogicComponent
     OBJECT(Character)
 
 public:
-    /// Construct.
-    Character(Context* context);
+	/// Construct.
+	Character(Context* context);
+	/// Destructor.
+	virtual ~Character();
 
-    /// Register object factory and attributes.
-    static void RegisterObject(Context* context);
-    
-    /// Handle startup. Called by LogicComponent base class. Creates model and loads animations.
+	/// Register object factory and attributes.
+	static void RegisterObject(Context* context);
+
+	/// Handle startup. Called by LogicComponent base class. Creates model and loads animations.
 	virtual void Start();
-    /// Handle physics world update. Called by LogicComponent base class.
+	/// Handle stop. Called by LogicComponent base class. Destruction this component.
+	virtual void Stop();
+	/// Handle physics world update. Called by LogicComponent base class.
 	virtual void FixedUpdate(float timeStep);
 	/// Handle scene post-update, Called by LogicCOmponent base class.
 	virtual void PostUpdate(float timeStep);
@@ -112,7 +116,6 @@ public:
     /// Movement controls. Assigned by the main program each frame.
     Controls controls_;
 
-	void Reset();
 	void FollowPath(float timeStep);
 	bool HasTurnRequest();
 	bool GetCurrentPoint(Vector3& point);
@@ -124,9 +127,10 @@ public:
 	CharacterSide GetSide() { return currentSide_; }
 	unsigned int GetNumPoints() { return runPath_[currentSide_].Size(); }
 	TurnState GetTurnState() { return turnState_; }
+	Node* GetCurrentBlock() { return currentBlock_; }
 	bool IsDead() { return isDead_; }
 	bool OnGround() { return onGround_; }
-	void SetCurrentPlatform(Node* platform) { currentPlatform_ = platform; }
+	void SetCurrentPlatform(Node* platform) { currentBlock_ = platform; }
 
 private:
     /// Handle physics collision events.
@@ -158,7 +162,7 @@ private:
 	TurnState turnState_;
 
 	RunPath runPath_;
-	WeakPtr<Node> currentPlatform_;
+	Node* currentBlock_;
 	PODVector<Node*> passedBlocks_;
 
 };

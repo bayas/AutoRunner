@@ -42,16 +42,18 @@
 Touch::Touch(Context* context) :
     Object(context),
     cameraDistance_(CAMERA_INITIAL_DIST),
-    touchButtonSize_(96),
-    touchButtonBorder_(12),
+    touchButtonSize_(192),
+    touchButtonBorder_(72),
     moveTouchID_(-1),
-    rotateTouchID_(-1),
-    fireTouchID_(-1),
+    /*rotateTouchID_(-1),
+    fireTouchID_(-1),*/
     firstPerson_(false),
     newFirstPerson_(false),
     shadowMode_(false),
     zoom_(false),
-    touchEnabled_(false)
+    touchEnabled_(false),
+	touchMoved_(false),
+	deltaXY_(IntVector2::ZERO)
 {
 }
 
@@ -64,29 +66,30 @@ void Touch::InitTouchInput()
     UI* ui = GetSubsystem<UI>();
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-    moveButton_ = ui->GetRoot()->CreateChild<BorderImage>();
+    /*moveButton_ = ui->GetRoot()->CreateChild<BorderImage>();
     moveButton_->SetTexture(cache->GetResource<Texture2D>("Textures/TouchInput.png"));
     moveButton_->SetImageRect(IntRect(0, 0, 96, 96));
-    moveButton_->SetAlignment(HA_LEFT, VA_BOTTOM);
+    moveButton_->SetAlignment(HA_LEFT, VA_CENTER);
     moveButton_->SetPosition(touchButtonBorder_, -touchButtonBorder_);
     moveButton_->SetSize(touchButtonSize_, touchButtonSize_);
-    moveButton_->SetOpacity(0.25f);
+    moveButton_->SetOpacity(0.25f);*/
 
-    fireButton_ = ui->GetRoot()->CreateChild<BorderImage>();
+    /*fireButton_ = ui->GetRoot()->CreateChild<BorderImage>();
     fireButton_->SetTexture(cache->GetResource<Texture2D>("Textures/TouchInput.png"));
     fireButton_->SetImageRect(IntRect(96, 0, 192, 96));
     fireButton_->SetAlignment(HA_RIGHT, VA_BOTTOM);
     fireButton_->SetPosition(-touchButtonBorder_, -touchButtonBorder_);
     fireButton_->SetSize(touchButtonSize_, touchButtonSize_);
-    fireButton_->SetOpacity(0.25f);
+    fireButton_->SetOpacity(0.25f);*/
     
     touchEnabled_ = true;
 }
 
 void Touch::SubscribeToTouchEvents()
 {
-    SubscribeToEvent(E_TOUCHBEGIN, HANDLER(Touch, HandleTouchBegin));
-    SubscribeToEvent(E_TOUCHEND, HANDLER(Touch, HandleTouchEnd));
+	SubscribeToEvent(E_TOUCHBEGIN, HANDLER(Touch, HandleTouchBegin));
+	SubscribeToEvent(E_TOUCHEND, HANDLER(Touch, HandleTouchEnd));
+	SubscribeToEvent(E_TOUCHMOVE, HANDLER(Touch, HandleTouchMove));
 }
 
 void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
@@ -141,36 +144,66 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
 
         // Rotate and Move
         if (!zoom_)
-        {
+		{
+			controls.Set(CTRL_FORWARD, true);
             for (unsigned i = 0; i < input->GetNumTouches(); ++i)
             {
                 TouchState* touch = input->GetTouch(i);
 
-                if (touch->touchID_ == rotateTouchID_)
+                /*if (touch->touchID_ == rotateTouchID_)
                 {
                     controls.yaw_ += TOUCH_SENSITIVITY * camera->GetFov() / (float)graphics->GetHeight() * touch->delta_.x_;
                     controls.pitch_ += TOUCH_SENSITIVITY * camera->GetFov() / (float)graphics->GetHeight() * touch->delta_.y_;
                     controls.pitch_ = Clamp(controls.pitch_, -80.0f, 80.0f); // Limit pitch
-                }
+                }*/
 
-                if (touch->touchID_ == moveTouchID_)
+				if (touchMoved_ && deltaXY_ != IntVector2::ZERO)
+				{
+					float degree = Urho3D::Atan2(-(float)deltaXY_.y_, (float)deltaXY_.x_);
+					//LOGINFO("Delta Position: " + delta.ToString());
+					//LOGINFO("Degree: " + String(degree));
+
+					if (Urho3D::Equals(degree, 0.0f))
+						controls.Set(CTRL_RIGHT, true);
+					if (Urho3D::Equals(degree, 180.0f))
+						controls.Set(CTRL_LEFT, true);
+
+					if (degree < 45 && degree > 0)
+						controls.Set(CTRL_RIGHT, true);
+					if (degree < 0 && degree > -45)
+						controls.Set(CTRL_RIGHT, true);
+					if (degree < 90 && degree > 45)
+						controls.Set(CTRL_JUMP, true);
+					if (degree < 135 && degree > 90)
+						controls.Set(CTRL_JUMP, true);
+					if (degree < 180 && degree > 135)
+						controls.Set(CTRL_LEFT, true);
+					if (degree < -180 && degree > -135)
+						controls.Set(CTRL_LEFT, true);
+					if (degree < -45 && degree > -90)
+						controls.Set(CTRL_BACK, true);
+					if (degree < -90 && degree > -135)
+						controls.Set(CTRL_BACK, true);
+				}
+
+                /*if (touch->touchID_ == moveTouchID_)
                 {
                     int relX = touch->position_.x_ - moveButton_->GetScreenPosition().x_ - touchButtonSize_ / 2;
                     int relY = touch->position_.y_ - moveButton_->GetScreenPosition().y_ - touchButtonSize_ / 2;
                     if (relY < 0 && Abs(relX * 3 / 2) < Abs(relY))
-                        controls.Set(CTRL_FORWARD, true);
+                        controls.Set(CTRL_JUMP, true);
                     if (relY > 0 && Abs(relX * 3 / 2) < Abs(relY))
                         controls.Set(CTRL_BACK, true);
                     if (relX < 0 && Abs(relY * 3 / 2) < Abs(relX))
                         controls.Set(CTRL_LEFT, true);
                     if (relX > 0 && Abs(relY * 3 / 2) < Abs(relX))
                         controls.Set(CTRL_RIGHT, true);
-                }
+                }*/
             }
         }
 
-        if (fireTouchID_ >= 0)
-            controls.Set(CTRL_JUMP, true);
+        /*if (fireTouchID_ >= 0)
+            controls.Set(CTRL_JUMP, true);*/
     }
 
     // Gyroscope (emulated by SDL through a virtual joystick)
@@ -181,12 +214,12 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
 		{
 			if (joystick->GetAxisPosition(1) < -GYROSCOPE_THRESHOLD)
 				controls.Set(CTRL_FORWARD, true);
-            /*if (joystick->GetAxisPosition(0) < -GYROSCOPE_THRESHOLD)
+            if (joystick->GetAxisPosition(0) < -GYROSCOPE_THRESHOLD)
                 controls.Set(CTRL_LEFT, true);
             if (joystick->GetAxisPosition(0) > GYROSCOPE_THRESHOLD)
                 controls.Set(CTRL_RIGHT, true);
             if (joystick->GetAxisPosition(1) > GYROSCOPE_THRESHOLD)
-                controls.Set(CTRL_BACK, true);*/
+                controls.Set(CTRL_BACK, true);
         }
     }
 }
@@ -201,16 +234,19 @@ void Touch::HandleTouchBegin(StringHash eventType, VariantMap& eventData)
     UI* ui = GetSubsystem<UI>();
     UIElement* element = ui->GetElementAt(pos, false); // Get gamepad UIElement touched (if any)
 
-    // Check for gamepad button touched. If none, rotate
-    if (element == moveButton_)
-        moveTouchID_ = touchID;
-    else if (element == fireButton_)
-        fireTouchID_ = touchID;
+	touchMoved_ = true;
+	beginTouch_ = pos;
+
+	// Check for gamepad button touched. If none, rotate
+	/*if (element == moveButton_)
+		moveTouchID_ = touchID;
+	if (element == fireButton_)
+		fireTouchID_ = touchID;
     else
-        rotateTouchID_ = touchID;
+        rotateTouchID_ = touchID;*/
 
     // Init Raycast (for example to acquire a target)
-    if (!cameraNode_ || !scene_)
+    /*if (!cameraNode_ || !scene_)
         return;
     Camera* camera = cameraNode_->GetComponent<Camera>();
     if (!camera)
@@ -230,24 +266,40 @@ void Touch::HandleTouchBegin(StringHash eventType, VariantMap& eventData)
     RayOctreeQuery rayQuery(result2, cameraRay, RAY_TRIANGLE, camera->GetFarClip(), DRAWABLE_GEOMETRY);
     scene_->GetComponent<Octree>()->RaycastSingle(rayQuery);
     if (result2.Size())
-        LOGINFO("Drawable raycast hit " + result2[0].drawable_->GetNode()->GetName());
+        LOGINFO("Drawable raycast hit " + result2[0].drawable_->GetNode()->GetName());*/
 }
 
 void Touch::HandleTouchEnd(StringHash eventType, VariantMap& eventData)
 {
     using namespace TouchBegin;
 
-    int touchID = eventData[P_TOUCHID].GetInt();
+	int touchID = eventData[P_TOUCHID].GetInt();
+	IntVector2 pos(eventData[P_X].GetInt(), eventData[P_Y].GetInt()); // Get touch coordinates
+	endTouch_ = pos;
+
+	deltaXY_ = IntVector2::ZERO;
+	touchMoved_ = false;
 
     if (touchID == moveTouchID_)
         moveTouchID_ = -1;
-    if (touchID == rotateTouchID_)
+    /*if (touchID == rotateTouchID_)
         rotateTouchID_ = -1;
     if (touchID == fireTouchID_)
-        fireTouchID_ = -1;
+        fireTouchID_ = -1;*/
 
     // On-release Update
     firstPerson_ = newFirstPerson_;
     GetSubsystem<Renderer>()->SetDrawShadows(shadowMode_);
 }
 
+void Touch::HandleTouchMove(StringHash eventType, VariantMap& eventData)
+{
+	using namespace TouchMove;
+
+	IntVector2 pos(eventData[P_X].GetInt(), eventData[P_Y].GetInt()); // Get touch coordinates
+	IntVector2 deltaPos(eventData[P_DX].GetInt(), eventData[P_DY].GetInt()); // Get touch coordinates
+
+	deltaXY_ = deltaPos;
+	//LOGINFO("Move Position: " + pos.ToString());
+	//LOGINFO("Delta Position: " + deltaPos.ToString());
+}

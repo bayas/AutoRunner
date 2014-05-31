@@ -53,13 +53,18 @@ Character::Character(Context* context) :
 	onJumpGround_(false),
 	rolling_(false),
 	isDead_(false),
-	currentPlatform_(0),
-	currentSide_(CharacterSide::CENTER_SIDE),
-	jumpState_(JumpState::STOP_JUMPING),
-	turnState_(TurnState::NO_SUCCEEDED)
+	currentBlock_(0),
+	currentSide_(CENTER_SIDE),
+	jumpState_(STOP_JUMPING),
+	turnState_(NO_SUCCEEDED)
 {
 	// Only the physics update event is needed: unsubscribe from the rest for optimization
 	SetUpdateEventMask(USE_FIXEDUPDATE|USE_POSTUPDATE);
+}
+
+Character::~Character()
+{
+	Stop();
 }
 
 void Character::RegisterObject(Context* context)
@@ -83,6 +88,13 @@ void Character::Start()
 	SubscribeToEvent(GetNode(), E_NODECOLLISIONEND, HANDLER(Character, HandleNodeCollisionEnd));
 
 	animCtrl_ = GetNode()->GetChild("PlayerModel")->GetComponent<AnimationController>();
+}
+
+void Character::Stop()
+{
+	// Remove all way-points and passed blocks.
+	runPath_.Clear();
+	RemovePassedBlocks();
 }
 
 void Character::FixedUpdate(float timeStep)
@@ -135,125 +147,110 @@ void Character::FixedUpdate(float timeStep)
 	}
 	else
 	{
-		// Remove closed points by character.
-		auto it = runPath_.Find(CharacterSide::CENTER_SIDE);
-		for (auto it = runPath_.Begin(); it != runPath_.End(); ++it)
+		if (controls_.IsDown(CTRL_FORWARD))
 		{
-			if (it->second_.Size() > 0)
-			{
-				Vector3 currentPoint = it->second_.Front();
-				Vector3 worldPos = GetNode()->GetWorldPosition();
-				currentPoint.y_ = worldPos.y_;
-				float length = (worldPos - currentPoint).Length();
-				if (length <= 1.0f)
-					RemoveFirstPoint();
-			}
-		}
-	}
-
-	if (controls_.IsDown(CTRL_FORWARD))
-	{
-		moveDir = Vector3::FORWARD;
-		body->ApplyImpulse(rot * moveDir * (softGrounded ? MOVE_FORCE : INAIR_MOVE_FORCE));
-	}
-
-	if (controls_.IsDown(CTRL_LEFT))
-	{
-		cntLeft++;
-		if (cntLeft > cntLimit)
-			turnState_ = TurnState::LEFT_SUCCEEDED;
-
-		if (coolDown <= 0)
-			coolDown = .3f;
-	}
-
-	if (controls_.IsDown(CTRL_RIGHT))
-	{
-		cntRight++;
-		if (cntRight > cntLimit)
-			turnState_ = TurnState::RIGHT_SUCCEEDED;
-
-		if (coolDown <= 0)
-			coolDown = .3f;
-	}
-
-	if (controls_.IsDown(CTRL_BACK))
-		rolling_ = true;
-
-	// Adjusting character collision shape's size and position each movement state.
-	if (rolling_ || jumpState_ == LOOP_JUMPING)
-	{
-		CollisionShape* shape = GetNode()->GetComponent<CollisionShape>();
-		shape->SetSize(Vector3(0.7f, 0.6f, 0.7f));
-		shape->SetPosition(Vector3(0.0f, 0.5f, 0.0f));
-	}
-	else
-	{
-		CollisionShape* shape = GetNode()->GetComponent<CollisionShape>();
-		shape->SetSize(Vector3(0.7f, 1.5f, 0.7f));
-		shape->SetPosition(Vector3(0.0f, 0.8f, 0.0f));
-	}
-
-	if (coolDown <= 0 && !controls_.IsDown(CTRL_LEFT))
-	{
-		cntLeft = 0;
-		turnState_ = TurnState::NO_SUCCEEDED;
-	}
-
-	if (coolDown <= 0 && !controls_.IsDown(CTRL_RIGHT))
-	{
-		cntRight = 0;
-		turnState_ = TurnState::NO_SUCCEEDED;
-	}
-
-	if (coolDown == .3f && !inTrigger_)
-	{
-		if (controls_.IsDown(CTRL_LEFT) && CheckSide(CTRL_LEFT))
-		{
-			moveDir = Vector3::LEFT;
-			turnState_ = TurnState::SIDE_LEFT_SUCCEEDED;
-
-			if (jumpState_ == JumpState::LOOP_JUMPING)
-				body->ApplyForce(rot * moveDir * MOVE_SIDE_AIR_FORCE);
-			else
-				body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
+			moveDir = Vector3::FORWARD;
+			body->ApplyImpulse(rot * moveDir * (softGrounded ? MOVE_FORCE : INAIR_MOVE_FORCE));
 		}
 
-		if (controls_.IsDown(CTRL_RIGHT) && CheckSide(CTRL_RIGHT))
+		if (controls_.IsDown(CTRL_LEFT))
 		{
-			moveDir = Vector3::RIGHT;
-			turnState_ = TurnState::SIDE_RIGHT_SUCCEEDED;
+			cntLeft++;
+			if (cntLeft > cntLimit)
+				turnState_ = LEFT_SUCCEEDED;
 
-			if (jumpState_ == JumpState::LOOP_JUMPING)
-				body->ApplyForce(rot * moveDir * MOVE_SIDE_AIR_FORCE);
-			else
-				body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
+			if (coolDown <= 0)
+				coolDown = .3f;
 		}
-	}
 
-	if (softGrounded)
-	{
-		// When on ground, apply a braking force to limit maximum ground velocity
-		Vector3 brakeForce = -planeVelocity * BRAKE_FORCE;
-		body->ApplyImpulse(brakeForce);
-
-		// Jump. Must release jump control inbetween jumps
-		if (controls_.IsDown(CTRL_JUMP))
+		if (controls_.IsDown(CTRL_RIGHT))
 		{
-			if (okToJump_)
-			{
-				body->ApplyImpulse(Vector3::UP * JUMP_FORCE);
-				okToJump_ = false;
-				//LOGDEBUG("Stopping run.");
-				animCtrl_->Stop(ANIM_RUN, 0.2f);
-				animCtrl_->Play(ANIM_JUMP_START, 0, false, 0.2f);
-				//LOGDEBUG("Playing jump start.");
-				jumpState_ = START_JUMPING;
-			}
+			cntRight++;
+			if (cntRight > cntLimit)
+				turnState_ = RIGHT_SUCCEEDED;
+
+			if (coolDown <= 0)
+				coolDown = .3f;
+		}
+
+		if (controls_.IsDown(CTRL_BACK))
+			rolling_ = true;
+
+		// Adjusting character collision shape's size and position each movement state.
+		if (rolling_ || jumpState_ == LOOP_JUMPING)
+		{
+			CollisionShape* shape = GetNode()->GetComponent<CollisionShape>();
+			shape->SetSize(Vector3(0.7f, 0.6f, 0.7f));
+			shape->SetPosition(Vector3(0.0f, 0.5f, 0.0f));
 		}
 		else
 		{
-			okToJump_ = true;
+			CollisionShape* shape = GetNode()->GetComponent<CollisionShape>();
+			shape->SetSize(Vector3(0.7f, 1.5f, 0.7f));
+			shape->SetPosition(Vector3(0.0f, 0.8f, 0.0f));
+		}
+
+		if (coolDown <= 0 && !controls_.IsDown(CTRL_LEFT))
+		{
+			cntLeft = 0;
+			turnState_ = NO_SUCCEEDED;
+		}
+
+		if (coolDown <= 0 && !controls_.IsDown(CTRL_RIGHT))
+		{
+			cntRight = 0;
+			turnState_ = NO_SUCCEEDED;
+		}
+
+		if (coolDown == .3f && !inTrigger_)
+		{
+			if (controls_.IsDown(CTRL_LEFT) && CheckSide(CTRL_LEFT))
+			{
+				moveDir = Vector3::LEFT;
+				turnState_ = SIDE_LEFT_SUCCEEDED;
+
+				if (jumpState_ == STOP_JUMPING)
+					body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
+				else
+					body->ApplyForce(rot * moveDir * MOVE_SIDE_AIR_FORCE);
+			}
+
+			if (controls_.IsDown(CTRL_RIGHT) && CheckSide(CTRL_RIGHT))
+			{
+				moveDir = Vector3::RIGHT;
+				turnState_ = SIDE_RIGHT_SUCCEEDED;
+
+				if (jumpState_ == STOP_JUMPING)
+					body->ApplyImpulse(rot * moveDir * MOVE_SIDE_FORCE);
+				else
+					body->ApplyForce(rot * moveDir * MOVE_SIDE_AIR_FORCE);
+			}
+		}
+
+		if (softGrounded)
+		{
+			// When on ground, apply a braking force to limit maximum ground velocity
+			Vector3 brakeForce = -planeVelocity * BRAKE_FORCE;
+			body->ApplyImpulse(brakeForce);
+
+			// Jump. Must release jump control inbetween jumps
+			if (controls_.IsDown(CTRL_JUMP) && jumpState_ == STOP_JUMPING)
+			{
+				if (okToJump_)
+				{
+					body->ApplyImpulse(Vector3::UP * JUMP_FORCE);
+					okToJump_ = false;
+					//LOGDEBUG("Stopping run.");
+					animCtrl_->Stop(ANIM_RUN, 0.2f);
+					animCtrl_->Play(ANIM_JUMP_START, 0, false, 0.2f);
+					//LOGDEBUG("Playing jump start.");
+					jumpState_ = START_JUMPING;
+				}
+			}
+			else
+			{
+				okToJump_ = true;
+			}
 		}
 	}
 
@@ -266,7 +263,6 @@ void Character::FixedUpdate(float timeStep)
 		GetNode()->GetScene()->GetComponent<PhysicsWorld>()->RaycastSingle(result, ray, 100.0f, FLOOR_COLLISION_MASK);
 		if (result.body_)
 		{
-			LOGDEBUG("Jump distance from floor: " + String(result.distance_));
 			if (result.distance_ < minJmpLoop)
 			{
 				if (jumpState_ == START_JUMPING)
@@ -293,52 +289,55 @@ void Character::FixedUpdate(float timeStep)
 					}
 				}
 			}
-			else if (jumpState_ == START_JUMPING)
+			else
 			{
-				//LOGDEBUG("Stopping jump start.");
-				animCtrl_->Stop(ANIM_JUMP_START, 0.2f);
-				jumpState_ = LOOP_JUMPING;
-			}
-			else if (jumpState_ == LOOP_JUMPING)
-			{
-				if (turnState_ == SIDE_LEFT_SUCCEEDED)
+				if (jumpState_ == START_JUMPING)
 				{
-					//LOGDEBUG("Stopping jump loop.");
-					animCtrl_->Stop(ANIM_JUMP_LOOP, 0.2f);
-					//LOGDEBUG("Playing jump left.");
-					animCtrl_->Play(ANIM_JUMP_LEFT, 0, false, 0.2f);
+					//LOGDEBUG("Stopping jump start.");
+					animCtrl_->Stop(ANIM_JUMP_START, 0.2f);
+					jumpState_ = LOOP_JUMPING;
 				}
-				else if (turnState_ == SIDE_RIGHT_SUCCEEDED)
+				else if (jumpState_ == LOOP_JUMPING)
 				{
-					//LOGDEBUG("Stopping jump loop.");
-					animCtrl_->Stop(ANIM_JUMP_LOOP, 0.2f);
-					//LOGDEBUG("Playing jump right.");
-					animCtrl_->Play(ANIM_JUMP_RIGHT, 0, false, 0.2f);
-				}
-				else
-				{
-					if (IsPlayedAnim(ANIM_JUMP_LEFT))
+					if (turnState_ == SIDE_LEFT_SUCCEEDED)
 					{
-						//LOGDEBUG("Stopping jump left.");
-						animCtrl_->Stop(ANIM_JUMP_LEFT, 0.1f);
+						//LOGDEBUG("Stopping jump loop.");
+						animCtrl_->Stop(ANIM_JUMP_LOOP, 0.2f);
+						//LOGDEBUG("Playing jump left.");
+						animCtrl_->Play(ANIM_JUMP_LEFT, 0, false, 0.2f);
 					}
-
-					if (IsPlayedAnim(ANIM_JUMP_RIGHT))
+					else if (turnState_ == SIDE_RIGHT_SUCCEEDED)
 					{
-						//LOGDEBUG("Stopping jump right.");
-						animCtrl_->Stop(ANIM_JUMP_RIGHT, 0.1f);
+						//LOGDEBUG("Stopping jump loop.");
+						animCtrl_->Stop(ANIM_JUMP_LOOP, 0.2f);
+						//LOGDEBUG("Playing jump right.");
+						animCtrl_->Play(ANIM_JUMP_RIGHT, 0, false, 0.2f);
 					}
+					else
+					{
+						if (IsPlayedAnim(ANIM_JUMP_LEFT))
+						{
+							//LOGDEBUG("Stopping jump left.");
+							animCtrl_->Stop(ANIM_JUMP_LEFT, 0.1f);
+						}
 
-					animCtrl_->Play(ANIM_JUMP_LOOP, 0, true, 0.2f);
-					animCtrl_->SetSpeed(ANIM_JUMP_LOOP, 0.4f);
-					//LOGDEBUG("Playing jump loop.");
+						if (IsPlayedAnim(ANIM_JUMP_RIGHT))
+						{
+							//LOGDEBUG("Stopping jump right.");
+							animCtrl_->Stop(ANIM_JUMP_RIGHT, 0.1f);
+						}
+
+						animCtrl_->Play(ANIM_JUMP_LOOP, 0, true, 0.2f);
+						animCtrl_->SetSpeed(ANIM_JUMP_LOOP, 0.4f);
+						//LOGDEBUG("Playing jump loop.");
+					}
 				}
 			}
 		}
 	}
 
 	// Play walk animation if moving on ground, otherwise fade it out
-	if (jumpState_ == STOP_JUMPING && softGrounded && !moveDir.Equals(Vector3::ZERO))
+	if (jumpState_ == STOP_JUMPING && softGrounded/* && !moveDir.Equals(Vector3::ZERO)*/)
 	{
 		if (rolling_)
 		{
@@ -376,6 +375,33 @@ void Character::FixedUpdate(float timeStep)
 
 void Character::PostUpdate(float timeStep)
 {
+	if (isDead_)
+		return;
+
+	// Remove closed points by character.
+	HashMap<unsigned, List<Vector3> >::Iterator it = runPath_.Find(CENTER_SIDE);
+	for (HashMap<unsigned, List<Vector3> >::Iterator it = runPath_.Begin(); it != runPath_.End(); ++it)
+	{
+		if (it->second_.Size() > 0)
+		{
+			Vector3 currentPoint = it->second_.Front();
+			Vector3 worldPos = GetNode()->GetWorldPosition();
+			currentPoint.y_ = worldPos.y_;
+			float length = (worldPos - currentPoint).Length();
+			if (length <= 1.0f)
+				RemoveFirstPoint();
+		}
+	}
+
+	if (inTrigger_)
+	{
+		Quaternion rot = GetNode()->GetWorldRotation();
+		controls_.pitch_ = rot.PitchAngle();
+		controls_.yaw_ = rot.YawAngle();
+		// Limit pitch
+		//controls_.pitch_ = Clamp(controls_.pitch_, -80.0f, 80.0f);
+	}
+
 	//LOGDEBUG("Character Node Scale: " + GetNode()->GetWorldScale().ToString());
 	return;
 }
@@ -397,7 +423,7 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
 	Variant var = otherNode->GetVar(GameVarirants::P_TURNPOINT);
 	if (!var.IsEmpty())
 	{
-		turnRequest_ = var.GetBool() && (turnState_ != TurnState::NO_SUCCEEDED);
+		turnRequest_ = var.GetBool() && (turnState_ != NO_SUCCEEDED);
 	}
 
 	// Get coin points
@@ -435,7 +461,7 @@ void Character::HandleNodeCollisionStart(StringHash eventType, VariantMap& event
 	Variant var = otherNode->GetVar(GameVarirants::P_TURNPOINT);
 	if (!var.IsEmpty())
 	{
-		turnRequest_ = var.GetBool() && (turnState_ != TurnState::NO_SUCCEEDED);
+		turnRequest_ = var.GetBool() && (turnState_ != NO_SUCCEEDED);
 		inTrigger_ = true;
 	}
 
@@ -443,15 +469,15 @@ void Character::HandleNodeCollisionStart(StringHash eventType, VariantMap& event
 	var = otherNode->GetVar(GameVarirants::P_ISINPLATFORM);
 	if (!var.IsEmpty())
 	{
-		Node* enteringPlatform = otherNode->GetParent();
+		Node* enteringBlock = otherNode->GetParent()->GetParent();
 
-		if (currentPlatform_)
+		if (currentBlock_)
 		{
-			if (currentPlatform_->GetID() != enteringPlatform->GetID())
-				passedBlocks_.Push(currentPlatform_);
+			if (currentBlock_->GetID() != enteringBlock->GetID())
+				passedBlocks_.Push(currentBlock_);
 		}
 
-		currentPlatform_ = enteringPlatform;
+		currentBlock_ = enteringBlock;
 	}
 
 	// Check obstacles.
@@ -522,7 +548,7 @@ void Character::AddToPath(CharacterSide side, const List<Vector3>& points)
 	if (points.Empty())
 		return;
 
-	auto it = runPath_.Find(side);
+	HashMap<unsigned, List<Vector3> >::Iterator it = runPath_.Find(side);
 	if (it == runPath_.End())
 		runPath_[side] = points;
 	else
@@ -531,7 +557,7 @@ void Character::AddToPath(CharacterSide side, const List<Vector3>& points)
 
 bool Character::GetCurrentPoint(Vector3& point)
 {
-	auto it = runPath_.Find(currentSide_);
+	HashMap<unsigned, List<Vector3> >::Iterator it = runPath_.Find(currentSide_);
 	if (it->second_.Size() == 0)
 		return false;
 
@@ -544,32 +570,6 @@ void Character::RemoveFirstPoint()
 	runPath_[LEFT_SIDE].PopFront();
 	runPath_[RIGHT_SIDE].PopFront();
 	runPath_[CENTER_SIDE].PopFront();
-}
-
-void Character::Reset()
-{
-	// Remove all way-points and passed blocks.
-	runPath_.Clear();
-	RemovePassedBlocks();
-	if (!currentPlatform_.Expired())
-		currentPlatform_->Remove();
-
-	isDead_ = false;
-	rolling_ = false;
-	turnRequest_ = false;
-	inTrigger_ = false;
-	score_ = 0;
-	inAirTimer_ = 0.0f;
-	currentPlatform_ = 0;
-	currentSide_ = CharacterSide::CENTER_SIDE;
-	jumpState_ = JumpState::STOP_JUMPING;
-	turnState_ = TurnState::NO_SUCCEEDED;
-
-	RigidBody* body = GetComponent<RigidBody>();
-
-	//LOGDEBUG("Stopping all.");
-	animCtrl_->StopAll();
-	body->SetLinearVelocity(Vector3::ZERO);
 }
 
 void Character::FollowPath(float timeStep)
@@ -606,12 +606,12 @@ bool Character::HasTurnRequest()
 		return false;
 
 	bool success = false;
-	int outs = currentPlatform_->GetVar(GameVarirants::P_OUT).GetInt();
+	int outs = currentBlock_->GetVar(GameVarirants::P_OUT).GetInt();
 	if (outs > 0) {
-		bool leftOut = currentPlatform_->GetVar(GameVarirants::P_LEFTOUT).GetBool();
-		bool rightOut = currentPlatform_->GetVar(GameVarirants::P_RIGHTOUT).GetBool();
+		bool leftOut = currentBlock_->GetVar(GameVarirants::P_LEFTOUT).GetBool();
+		bool rightOut = currentBlock_->GetVar(GameVarirants::P_RIGHTOUT).GetBool();
 
-		success = (leftOut && turnState_ == TurnState::LEFT_SUCCEEDED) || (rightOut && turnState_ == TurnState::RIGHT_SUCCEEDED);
+		success = (leftOut && turnState_ == LEFT_SUCCEEDED) || (rightOut && turnState_ == RIGHT_SUCCEEDED);
 	}
 
 	return success;
@@ -622,8 +622,11 @@ void Character::RemovePassedBlocks()
 	if (passedBlocks_.Size() <= 0)
 		return;
 
-	for (auto it = passedBlocks_.Begin(); it != passedBlocks_.End(); ++it)
-		(*it)->Remove();
+	for (PODVector<Node*>::Iterator it = passedBlocks_.Begin(); it != passedBlocks_.End(); ++it)
+	{
+		Node* passedBlock = *it;
+		passedBlock->Remove();
+	}
 
 	passedBlocks_.Clear();
 }
