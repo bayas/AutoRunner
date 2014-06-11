@@ -628,6 +628,7 @@ void AutoRunner::CreateLevel()
 		// Create coins in appropriate slots.
 		Node* slots = blockNode->GetChild("Slots");
 		PODVector<Node*> coinSlots;
+		PODVector<Node*> obstacleSlots;
 		for (unsigned int slotIndex = 0; slotIndex < slots->GetNumChildren(); slotIndex++)
 		{
 			Node* slot = slots->GetChild(slotIndex);
@@ -652,7 +653,6 @@ void AutoRunner::CreateLevel()
 		}
 
 		// Create obstacles in appropriate slots.
-		PODVector<Node*> obstacleSlots;
 		if (numBlocks_ > 0 && !obstacleSlots.Empty())
 		{
 			//int slotSize = obstacleSlots.Size();
