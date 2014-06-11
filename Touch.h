@@ -37,7 +37,7 @@ namespace Urho3D
 
 const float TOUCH_SENSITIVITY = 5.0f;
 const float GYROSCOPE_THRESHOLD = 0.1f;
-const float CAMERA_MIN_DIST = 1.0f;
+const float CAMERA_MIN_DIST = 4.99f;
 const float CAMERA_INITIAL_DIST = 5.0f;
 const float CAMERA_MAX_DIST = 20.0f;
 
@@ -80,6 +80,8 @@ public:
 	void HandleTouchEnd(StringHash eventType, VariantMap& eventData);
 	/// Handle finger touch end.
 	void HandleTouchMove(StringHash eventType, VariantMap& eventData);
+	/// Reset touch parameters.
+	void Reset();
 
     /// Scene. Needs to be assigned by the application.
     WeakPtr<Scene> scene_;
@@ -94,7 +96,7 @@ public:
     /// Distance of gamepad buttons from the screen corners.
     int touchButtonBorder_;
     /// Current ID of the move touch, or -1 for none.
-    int moveTouchID_;
+    //int moveTouchID_;
     /// Current ID of the rotate touch, or -1 for none.
     //int rotateTouchID_;
     /// Current ID of the fire/jump touch, or -1 for none.
@@ -112,13 +114,18 @@ public:
     /// Touch input initialized flag.
     bool touchEnabled_;
 
+private:
+	bool IsBack(const IntVector2& delta, float degree);
+	bool IsLeft(const IntVector2& delta, float degree);
+	bool IsRight(const IntVector2& delta, float degree);
+	bool IsUp(const IntVector2& delta, float degree);
+
 	/// Game mechanics.
 	bool touchMoved_;
+	/// Max movement between TouchBegin and TouchEnd event.
+	unsigned int maxMovement_;
 	IntVector2 deltaXY_;
-	IntVector2 endTouch_;
-	IntVector2 beginTouch_;
 	PODVector<IntVector2> moveTouches_;
-	unsigned int touchCount_;
 
 };
 

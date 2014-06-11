@@ -45,7 +45,6 @@ namespace Urho3D
 Character::Character(Context* context) :
     LogicComponent(context),
     onGround_(false),
-    okToJump_(true),
     inAirTimer_(0.0f),
 	score_(0),
 	turnRequest_(false),
@@ -76,7 +75,6 @@ void Character::RegisterObject(Context* context)
     ATTRIBUTE(Character, VAR_FLOAT, "Controls Yaw", controls_.yaw_, 0.0f, AM_DEFAULT);
     ATTRIBUTE(Character, VAR_FLOAT, "Controls Pitch", controls_.pitch_, 0.0f, AM_DEFAULT);
     ATTRIBUTE(Character, VAR_BOOL, "On Ground", onGround_, false, AM_DEFAULT);
-    ATTRIBUTE(Character, VAR_BOOL, "OK To Jump", okToJump_, true, AM_DEFAULT);
     ATTRIBUTE(Character, VAR_FLOAT, "In Air Timer", inAirTimer_, 0.0f, AM_DEFAULT);
 }
 
@@ -100,9 +98,6 @@ void Character::Stop()
 void Character::FixedUpdate(float timeStep)
 {
 	static float coolDown = 0.0f;
-	static int cntLeft = 0;
-	static int cntRight = 0;
-	static int cntLimit = 20;
 
 	if (coolDown > 0)
 		coolDown -= timeStep;
@@ -153,24 +148,25 @@ void Character::FixedUpdate(float timeStep)
 			body->ApplyImpulse(rot * moveDir * (softGrounded ? MOVE_FORCE : INAIR_MOVE_FORCE));
 		}
 
+		if (controls_.IsDown(CTRL_BACK|CTRL_JUMP|CTRL_LEFT|CTRL_RIGHT) && coolDown <= 0)
+			coolDown = 0.2f;
+
 		if (controls_.IsDown(CTRL_LEFT))
 		{
-			cntLeft++;
-			if (cntLeft > cntLimit)
-				turnState_ = LEFT_SUCCEEDED;
-
-			if (coolDown <= 0)
-				coolDown = .3f;
+			turnState_ = LEFT_SUCCEEDED;
+		}
+		else if (coolDown <= 0)
+		{
+			turnState_ = NO_SUCCEEDED;
 		}
 
 		if (controls_.IsDown(CTRL_RIGHT))
 		{
-			cntRight++;
-			if (cntRight > cntLimit)
-				turnState_ = RIGHT_SUCCEEDED;
-
-			if (coolDown <= 0)
-				coolDown = .3f;
+			turnState_ = RIGHT_SUCCEEDED;
+		}
+		else if (coolDown <= 0)
+		{
+			turnState_ = NO_SUCCEEDED;
 		}
 
 		if (controls_.IsDown(CTRL_BACK))
@@ -190,19 +186,7 @@ void Character::FixedUpdate(float timeStep)
 			shape->SetPosition(Vector3(0.0f, 0.8f, 0.0f));
 		}
 
-		if (coolDown <= 0 && !controls_.IsDown(CTRL_LEFT))
-		{
-			cntLeft = 0;
-			turnState_ = NO_SUCCEEDED;
-		}
-
-		if (coolDown <= 0 && !controls_.IsDown(CTRL_RIGHT))
-		{
-			cntRight = 0;
-			turnState_ = NO_SUCCEEDED;
-		}
-
-		if (coolDown == .3f && !inTrigger_)
+		if (Urho3D::Equals(coolDown, 0.2f) && !inTrigger_)
 		{
 			if (controls_.IsDown(CTRL_LEFT) && CheckSide(CTRL_LEFT))
 			{
@@ -234,22 +218,14 @@ void Character::FixedUpdate(float timeStep)
 			body->ApplyImpulse(brakeForce);
 
 			// Jump. Must release jump control inbetween jumps
-			if (controls_.IsDown(CTRL_JUMP) && jumpState_ == STOP_JUMPING)
+			if (Urho3D::Equals(coolDown, 0.2f) && controls_.IsDown(CTRL_JUMP) && jumpState_ == STOP_JUMPING)
 			{
-				if (okToJump_)
-				{
-					body->ApplyImpulse(Vector3::UP * JUMP_FORCE);
-					okToJump_ = false;
-					//LOGDEBUG("Stopping run.");
-					animCtrl_->Stop(ANIM_RUN, 0.2f);
-					animCtrl_->Play(ANIM_JUMP_START, 0, false, 0.2f);
-					//LOGDEBUG("Playing jump start.");
-					jumpState_ = START_JUMPING;
-				}
-			}
-			else
-			{
-				okToJump_ = true;
+				body->ApplyImpulse(Vector3::UP * JUMP_FORCE);
+				//LOGDEBUG("Stopping run.");
+				animCtrl_->Stop(ANIM_RUN, 0.2f);
+				animCtrl_->Play(ANIM_JUMP_START, 0, false, 0.2f);
+				//LOGDEBUG("Playing jump start.");
+				jumpState_ = START_JUMPING;
 			}
 		}
 	}
@@ -398,9 +374,10 @@ void Character::PostUpdate(float timeStep)
 		Quaternion rot = GetNode()->GetWorldRotation();
 		controls_.pitch_ = rot.PitchAngle();
 		controls_.yaw_ = rot.YawAngle();
-		// Limit pitch
-		//controls_.pitch_ = Clamp(controls_.pitch_, -80.0f, 80.0f);
 	}
+
+	//LOGDEBUG("Character y: " + String(node_->GetWorldPosition().y_));
+	//LOGDEBUG("PLatform y: " + String(currentBlock_->GetChild("Floor")->GetWorldPosition().y_));
 
 	//LOGDEBUG("Character Node Scale: " + GetNode()->GetWorldScale().ToString());
 	return;

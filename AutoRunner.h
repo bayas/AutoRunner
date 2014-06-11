@@ -101,8 +101,10 @@ private:
 	bool isPlaying_;
 	unsigned int numBlocks_;
 	List<Node*> blocks_;
-	Matrix3x4 lastOutWorldTransform_;
+	Vector3 lastOutWorldPosition_;
+	Quaternion lastOutWorldRotation_;
 	Text* scoreText_;
+	Text* loadingText_;
 	Menu* gameMenu_;
 	Node* characterHead_;
 	PODVector<DebugLine> lines_;

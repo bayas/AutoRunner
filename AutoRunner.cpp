@@ -69,6 +69,9 @@
 #include "UIEvents.h"
 #include "Console.h"
 #include "Profiler.h"
+#include "Sound.h"
+#include "SoundSource.h"
+
 #include "DebugNew.h"
 
 // Expands to this example's entry-point
@@ -137,7 +140,7 @@ void AutoRunner::Start()
 	// Subscribe to necessary events
 	SubscribeToEvents();
 
-	GetSubsystem<Console>()->Toggle();
+	//GetSubsystem<Console>()->Toggle();
 	GetSubsystem<Console>()->SetFocusOnShow(false);
 	GetSubsystem<Graphics>()->SetWindowTitle("AutoRunner Kit Game");
 	SetLogoVisible(false);
@@ -175,6 +178,16 @@ void AutoRunner::InitScene()
 		sun2->SetShadowCascade(CascadeParameters(15.0f, 0.0f, 0.0f, 0.0f, 0.9f));
 		sun2->SetShadowIntensity(0.333f);
 	}
+
+	// Create music
+	Sound* sound = cache->GetResource<Sound>("Music/Ninja Gods.ogg");
+	Node* soundNode = scene_->CreateChild("Sound");
+	SoundSource* soundSource = soundNode->CreateComponent<SoundSource>();
+	soundSource->Play(sound);
+	// In case we also play music, set the sound volume below maximum so that we don't clip the output
+	soundSource->SetGain(0.75f);
+	// Set the sound component to automatically remove its scene node from the scene when the sound is done playing
+	soundSource->SetAutoRemove(true);
 }
 
 void AutoRunner::CreateCharacter()
@@ -257,6 +270,16 @@ void AutoRunner::CreateOverlays()
 	scoreText_->SetAlignment(HA_LEFT, VA_TOP);
 	scoreText_->SetColor(C_BOTTOMLEFT, Color(1, 1, 0.25));
 	scoreText_->SetColor(C_BOTTOMRIGHT, Color(1, 1, 0.25));
+
+	// Construct Loading Text object.
+	loadingText_ = ui->GetRoot()->CreateChild<Text>();
+	loadingText_->SetText("Loading...");
+	loadingText_->SetFont(cache->GetResource<Font>("Fonts/BlueHighway.ttf"), 20);
+	loadingText_->SetPosition(5, 5);
+	loadingText_->SetAlignment(HA_CENTER, VA_CENTER);
+	loadingText_->SetColor(C_BOTTOMLEFT, Color(1, 1, 0.25));
+	loadingText_->SetColor(C_BOTTOMRIGHT, Color(1, 1, 0.25));
+	loadingText_->SetVisible(false);
 }
 
 void AutoRunner::SubscribeToEvents()
@@ -503,15 +526,19 @@ void AutoRunner::HandleControlClicked(StringHash eventType, VariantMap& eventDat
 		String name = clicked->GetName();
 		if (name == "PlayBtn")
 		{
+			gameMenu_->SetVisible(false);
+			gameMenu_->SetEnabled(false);
+			gameMenu_->SetFocus(false);
+			loadingText_->SetVisible(true);
+
 			if (character_ && character_->IsDead())
 				ResetGame();
 
 			InitGame();
-			gameMenu_->SetVisible(false);
-			gameMenu_->SetEnabled(false);
-			gameMenu_->SetFocus(false);
 			if (!touch_->touchEnabled_)
 				GetSubsystem<UI>()->GetCursor()->SetVisible(false);
+
+			loadingText_->SetVisible(false);
 		}
 		else if (name == "ExitBtn")
 		{
@@ -524,21 +551,19 @@ void AutoRunner::CreateLevel()
 {
 	int cnt = 3;
 	int maxRecursive = 30;
-	int maxBlockNumber = 7;
+	int maxBlockNumber = 6;
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
 	while (cnt > 0)
 	{
-		Vector3 blockPos = lastOutWorldTransform_.Translation();
-		Quaternion blockRot = lastOutWorldTransform_.Rotation();
+		Vector3 blockPos = lastOutWorldPosition_;
+		Quaternion blockRot = lastOutWorldRotation_;
 
 		// Initial transform has been given from out node.
 		int rnd = Random(maxBlockNumber) + 1;
 		// Set the starting platform.
 		if (numBlocks_ == 0)
 			rnd = 1;
-		else if (rnd == 1 || rnd == 7 || rnd == 6)
-			rnd = 5;
 
 		String prefabName = "Objects/Block" + String(rnd) + ".xml";
 		SharedPtr<File> fBlock1 = cache->GetFile(prefabName);
@@ -603,7 +628,6 @@ void AutoRunner::CreateLevel()
 		// Create coins in appropriate slots.
 		Node* slots = blockNode->GetChild("Slots");
 		PODVector<Node*> coinSlots;
-		PODVector<Node*> obstacleSlots;
 		for (unsigned int slotIndex = 0; slotIndex < slots->GetNumChildren(); slotIndex++)
 		{
 			Node* slot = slots->GetChild(slotIndex);
@@ -628,6 +652,7 @@ void AutoRunner::CreateLevel()
 		}
 
 		// Create obstacles in appropriate slots.
+		PODVector<Node*> obstacleSlots;
 		if (numBlocks_ > 0 && !obstacleSlots.Empty())
 		{
 			//int slotSize = obstacleSlots.Size();
@@ -655,7 +680,7 @@ void AutoRunner::CreateLevel()
 
 		// If the last block is the straight then,
 		// Go ahead creating the block until the last block is turned one.
-		if (cnt == 0 && (rnd == 1 || rnd == 5 || rnd == 6))
+		if (cnt == 0 && (rnd == 1 || rnd == 5 || rnd == 6 || rnd == 7))
 		{
 			// TODO: You should check the length of straight path.
 			cnt++;
@@ -665,7 +690,8 @@ void AutoRunner::CreateLevel()
 		if (rnd == 4)
 			cnt = 0;
 
-		lastOutWorldTransform_ = Matrix3x4(outNode->GetWorldPosition(), outNode->GetWorldRotation(), 1);
+		lastOutWorldPosition_ = outNode->GetWorldPosition();
+		lastOutWorldRotation_ = outNode->GetWorldRotation();
 	}
 
 	UpdatePath();
@@ -703,7 +729,8 @@ void AutoRunner::UpdatePath(bool startIn)
 
 			// Set the last out world transform.
 			Node* outNode = block->GetChild(posix);
-			lastOutWorldTransform_ = Matrix3x4(outNode->GetWorldPosition(), outNode->GetWorldRotation(), 1);
+			lastOutWorldPosition_ = outNode->GetWorldPosition();
+			lastOutWorldRotation_ = outNode->GetWorldRotation();
 		}
 
 		Node* path = paths->GetChild("Center" + posix);
@@ -716,7 +743,8 @@ void AutoRunner::UpdatePath(bool startIn)
 			// Create a box-model component to see each path point.
 			/*StaticModel* boxObject = pointNode->CreateComponent<StaticModel>();
 			boxObject->SetModel(GetSubsystem<ResourceCache>()->GetResource<Model>("Models/Box.mdl"));
-			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));*/
+			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));
+			pointNode->SetScale(Vector3(0.1f, 0.1f, 0.1f));*/
 		}
 
 		path = paths->GetChild("Left" + posix);
@@ -729,7 +757,8 @@ void AutoRunner::UpdatePath(bool startIn)
 			// Create a box-model component to see each path point.
 			/*StaticModel* boxObject = pointNode->CreateComponent<StaticModel>();
 			boxObject->SetModel(GetSubsystem<ResourceCache>()->GetResource<Model>("Models/Box.mdl"));
-			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));*/
+			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));
+			pointNode->SetScale(Vector3(0.1f, 0.1f, 0.1f));*/
 		}
 
 		path = paths->GetChild("Right" + posix);
@@ -742,7 +771,8 @@ void AutoRunner::UpdatePath(bool startIn)
 			// Create a box-model component to see each path point.
 			/*StaticModel* boxObject = pointNode->CreateComponent<StaticModel>();
 			boxObject->SetModel(GetSubsystem<ResourceCache>()->GetResource<Model>("Models/Box.mdl"));
-			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));*/
+			boxObject->SetMaterial(GetSubsystem<ResourceCache>()->GetResource<Material>("Materials/Stone.xml"));
+			pointNode->SetScale(Vector3(0.1f, 0.1f, 0.1f));*/
 		}
 
 		if (outs > 0)
@@ -803,20 +833,57 @@ void AutoRunner::CreateUI()
 		if (gameMenu_->LoadXML(gameMenu->GetRoot(), style))
 		{
 			Graphics* graphics = GetSubsystem<Graphics>();
-			IntVector2 menuSize = gameMenu_->GetSize();
-			int height = (int)(graphics->GetHeight() - menuSize.y_) / 2;
-			int width = (int)(graphics->GetWidth() - menuSize.x_) / 2;
+			// Set size of game menu according to the render window.
+			int winHeight = graphics->GetHeight();
+			int winWidth = graphics->GetWidth();
+			IntVector2 menuSize = IntVector2((int)(winWidth * 0.3f), (int)(winHeight * 0.3f));
+			gameMenu_->SetSize(menuSize);
+			//IntVector2 menuSize = gameMenu_->GetSize();
+			// Set the position of game menu corresponding to its size.
+			int height = (int)(winHeight - menuSize.y_) / 2;
+			int width = (int)(winWidth - menuSize.x_) / 2;
 			gameMenu_->SetPosition(width, height);
 			gameMenu_->SetFocus(true);
-		}
+			// Set button's size
+			String btnName = "PlayBtn";
+			IntVector2 btnSize = IntVector2((int)(menuSize.x_ * 0.4f), (int)(menuSize.y_ * 0.3f));
+			Button* btn = static_cast<Button*>(gameMenu_->GetChild(btnName));
+			btn->SetSize(btnSize);
+			IntVector2 btnPos = IntVector2((int)(menuSize.x_ * 0.1f), (int)(menuSize.y_ * 0.05f));
+			btn->SetPosition(btnPos);
+			btnName = "ExitBtn";
+			btn = static_cast<Button*>(gameMenu_->GetChild(btnName));
+			btn->SetSize(btnSize);
+			btnPos = IntVector2((int)(menuSize.x_ * 0.9f), (int)(menuSize.y_ * 0.05f));
+			btnPos.x_ -= btnSize.x_;
+			btn->SetPosition(btnPos);
 
-		String elementName = "LastScoreText";
-		Text* lastScoreText = static_cast<Text*>(gameMenu_->GetChild(elementName));
-		lastScoreText->SetVisible(false);
-		elementName = "HighScoreText";
-		Text* highScoreText = static_cast<Text*>(gameMenu_->GetChild(elementName));
-		highScoreText->SetVisible(false);
-		highScoreText->GetChild(0)->SetVisible(false);
+			// Set text's size and positions.
+			String txtName = "LastScoreText";
+			Text* txt = static_cast<Text*>(gameMenu_->GetChild(txtName));
+			IntVector2 textSize = IntVector2((int)(menuSize.x_ * 0.5f), (int)(menuSize.y_ * 0.1f));
+			IntVector2 textPos = IntVector2((int)(menuSize.x_ * 0.05f), (int)(menuSize.y_ * 0.1f));
+			txt->SetSize(textSize);
+			txt->SetPosition(textPos);
+			txt->SetFont("Fonts/BlueHighway.ttf", (int)(textSize.y_ * 0.8f));
+			txt->SetVisible(false);
+			txtName = "HighScoreText";
+			txt = static_cast<Text*>(gameMenu_->GetChild(txtName));
+			textSize = IntVector2((int)(menuSize.x_ * 0.5f), (int)(menuSize.y_ * 0.1f));
+			textPos = IntVector2((int)(menuSize.x_ * 0.05f), (int)(menuSize.y_ * 0.8f));
+			txt->SetSize(textSize);
+			txt->SetPosition(textPos);
+			txt->SetFont("Fonts/BlueHighway.ttf", (int)(textSize.y_ * 0.8f));
+			txt->SetVisible(false);
+			txt->GetChild(0)->SetVisible(false);
+			txtName = "InfoText";
+			txt = static_cast<Text*>(gameMenu_->GetChild(txtName));
+			textSize = IntVector2((int)(menuSize.x_ * 0.5f), (int)(menuSize.y_ * 0.1f));
+			textPos = IntVector2((int)(menuSize.x_ * 0.1f), (int)(menuSize.y_ * 0.25f));
+			txt->SetSize(textSize);
+			txt->SetPosition(textPos);
+			txt->SetFont("Fonts/BlueHighway.ttf", (int)(textSize.y_ * 0.8f));
+		}
 	}
 
 	// Subscribe also to all UI mouse clicks just to see where we have clicked
@@ -829,7 +896,8 @@ void AutoRunner::InitGame()
 	CreateCharacter();
 
 	// Set initial parameters
-	lastOutWorldTransform_ = Matrix3x4(Vector3(0.0f, 0.0f, -2.0f), Quaternion(90, Vector3(0, 1, 0)), 1);
+	lastOutWorldPosition_ = Vector3(0.0f, 0.0f, -2.0f);
+	lastOutWorldRotation_ = Quaternion(90, Vector3(0, 1, 0));
 	yaw_ = pitch_ = 0.0f;
 	scoreText_->SetText("Score 0");
 
@@ -860,4 +928,6 @@ void AutoRunner::ResetGame()
 	}
 	// Remove all blocks.
 	blocks_.Clear();
+	// Reset some classes.
+	touch_->Reset();
 }

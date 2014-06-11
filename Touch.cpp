@@ -44,8 +44,8 @@ Touch::Touch(Context* context) :
     cameraDistance_(CAMERA_INITIAL_DIST),
     touchButtonSize_(192),
     touchButtonBorder_(72),
-    moveTouchID_(-1),
-    /*rotateTouchID_(-1),
+    /*moveTouchID_(-1),
+    rotateTouchID_(-1),
     fireTouchID_(-1),*/
     firstPerson_(false),
     newFirstPerson_(false),
@@ -53,6 +53,7 @@ Touch::Touch(Context* context) :
     zoom_(false),
     touchEnabled_(false),
 	touchMoved_(false),
+	maxMovement_(0),
 	deltaXY_(IntVector2::ZERO)
 {
 }
@@ -148,9 +149,9 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
 			controls.Set(CTRL_FORWARD, true);
             for (unsigned i = 0; i < input->GetNumTouches(); ++i)
             {
-                TouchState* touch = input->GetTouch(i);
+                /*TouchState* touch = input->GetTouch(i);
 
-                /*if (touch->touchID_ == rotateTouchID_)
+                if (touch->touchID_ == rotateTouchID_)
                 {
                     controls.yaw_ += TOUCH_SENSITIVITY * camera->GetFov() / (float)graphics->GetHeight() * touch->delta_.x_;
                     controls.pitch_ += TOUCH_SENSITIVITY * camera->GetFov() / (float)graphics->GetHeight() * touch->delta_.y_;
@@ -160,30 +161,29 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
 				if (touchMoved_ && deltaXY_ != IntVector2::ZERO)
 				{
 					float degree = Urho3D::Atan2(-(float)deltaXY_.y_, (float)deltaXY_.x_);
-					//LOGINFO("Delta Position: " + delta.ToString());
-					//LOGINFO("Degree: " + String(degree));
+					if (IsLeft(deltaXY_, degree))
+					{
+						controls.Set(CTRL_LEFT, true);
+						maxMovement_++;
+					}
 
-					if (Urho3D::Equals(degree, 0.0f))
+					if (IsRight(deltaXY_, degree))
+					{
 						controls.Set(CTRL_RIGHT, true);
-					if (Urho3D::Equals(degree, 180.0f))
-						controls.Set(CTRL_LEFT, true);
+						maxMovement_++;
+					}
 
-					if (degree < 45 && degree > 0)
-						controls.Set(CTRL_RIGHT, true);
-					if (degree < 0 && degree > -45)
-						controls.Set(CTRL_RIGHT, true);
-					if (degree < 90 && degree > 45)
-						controls.Set(CTRL_JUMP, true);
-					if (degree < 135 && degree > 90)
-						controls.Set(CTRL_JUMP, true);
-					if (degree < 180 && degree > 135)
-						controls.Set(CTRL_LEFT, true);
-					if (degree < -180 && degree > -135)
-						controls.Set(CTRL_LEFT, true);
-					if (degree < -45 && degree > -90)
+					if (IsBack(deltaXY_, degree))
+					{
 						controls.Set(CTRL_BACK, true);
-					if (degree < -90 && degree > -135)
-						controls.Set(CTRL_BACK, true);
+						maxMovement_++;
+					}
+
+					if (IsUp(deltaXY_, degree))
+					{
+						controls.Set(CTRL_JUMP, true);
+						maxMovement_++;
+					}
 				}
 
                 /*if (touch->touchID_ == moveTouchID_)
@@ -207,7 +207,7 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
     }
 
     // Gyroscope (emulated by SDL through a virtual joystick)
-    if (input->GetNumJoysticks() > 0) // numJoysticks = 1 on iOS & Android
+    /*if (input->GetNumJoysticks() > 0) // numJoysticks = 1 on iOS & Android
     {
         JoystickState* joystick = input->GetJoystick(0);
         if (joystick->GetNumAxes() >= 2)
@@ -221,24 +221,25 @@ void Touch::UpdateTouches(Controls& controls) // Called from HandleUpdate
             if (joystick->GetAxisPosition(1) > GYROSCOPE_THRESHOLD)
                 controls.Set(CTRL_BACK, true);
         }
-    }
+    }*/
 }
 
 void Touch::HandleTouchBegin(StringHash eventType, VariantMap& eventData)
 {
     using namespace TouchBegin;
 
-    int touchID = eventData[P_TOUCHID].GetInt(); // Get #touches or dragging value
+	touchMoved_ = true;
+	deltaXY_ = IntVector2::ZERO;
+	maxMovement_ = 0;
+
+    /*int touchID = eventData[P_TOUCHID].GetInt(); // Get #touches or dragging value
     IntVector2 pos(eventData[P_X].GetInt(), eventData[P_Y].GetInt()); // Get touch coordinates
 
     UI* ui = GetSubsystem<UI>();
     UIElement* element = ui->GetElementAt(pos, false); // Get gamepad UIElement touched (if any)
 
-	touchMoved_ = true;
-	beginTouch_ = pos;
-
 	// Check for gamepad button touched. If none, rotate
-	/*if (element == moveButton_)
+	if (element == moveButton_)
 		moveTouchID_ = touchID;
 	if (element == fireButton_)
 		fireTouchID_ = touchID;
@@ -273,16 +274,14 @@ void Touch::HandleTouchEnd(StringHash eventType, VariantMap& eventData)
 {
     using namespace TouchBegin;
 
-	int touchID = eventData[P_TOUCHID].GetInt();
-	IntVector2 pos(eventData[P_X].GetInt(), eventData[P_Y].GetInt()); // Get touch coordinates
-	endTouch_ = pos;
+	//int touchID = eventData[P_TOUCHID].GetInt();
+	//IntVector2 pos(eventData[P_X].GetInt(), eventData[P_Y].GetInt()); // Get touch coordinates
 
-	deltaXY_ = IntVector2::ZERO;
 	touchMoved_ = false;
 
-    if (touchID == moveTouchID_)
+    /*if (touchID == moveTouchID_)
         moveTouchID_ = -1;
-    /*if (touchID == rotateTouchID_)
+    if (touchID == rotateTouchID_)
         rotateTouchID_ = -1;
     if (touchID == fireTouchID_)
         fireTouchID_ = -1;*/
@@ -298,8 +297,61 @@ void Touch::HandleTouchMove(StringHash eventType, VariantMap& eventData)
 
 	IntVector2 pos(eventData[P_X].GetInt(), eventData[P_Y].GetInt()); // Get touch coordinates
 	IntVector2 deltaPos(eventData[P_DX].GetInt(), eventData[P_DY].GetInt()); // Get touch coordinates
+	unsigned int sampleSize = 3;
 
-	deltaXY_ = deltaPos;
-	//LOGINFO("Move Position: " + pos.ToString());
-	//LOGINFO("Delta Position: " + deltaPos.ToString());
+	if(moveTouches_.Size() >= sampleSize)
+	{
+		for (unsigned int i = 0; i < moveTouches_.Size(); i++)
+			deltaXY_ += moveTouches_[i];
+
+		if (maxMovement_ > 1)
+			deltaXY_ = IntVector2::ZERO;
+		else
+			deltaXY_ /= sampleSize;
+
+		moveTouches_.Clear();
+	}
+	else
+	{
+		moveTouches_.Push(deltaPos);
+	}
+}
+
+void Touch::Reset()
+{
+	touchMoved_ = false;
+	maxMovement_ = 0;
+	deltaXY_ = IntVector2::ZERO;
+}
+
+bool Touch::IsBack(const IntVector2& delta, float degree)
+{
+	if (Urho3D::Equals(degree, -90.0f) || (degree < -45 && degree > -90) || (degree < -90 && degree > -135))
+		return true;
+
+	return false;
+}
+
+bool Touch::IsLeft(const IntVector2& delta, float degree)
+{
+	if (Urho3D::Equals(degree, -180.0f) || (degree < 180 && degree > 135) || (degree > -180 && degree < -135))
+		return true;
+
+	return false;
+}
+
+bool Touch::IsRight(const IntVector2& delta, float degree)
+{
+	if (Urho3D::Equals(degree, 0.0f) || (degree < 45 && degree > 0) || (degree < 0 && degree > -45))
+		return true;
+
+	return false;
+}
+
+bool Touch::IsUp(const IntVector2& delta, float degree)
+{
+	if (Urho3D::Equals(degree, 90.0f) || (degree < 90 && degree > 45) || (degree < 135 && degree > 90))
+		return true;
+
+	return false;
 }
