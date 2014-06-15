@@ -36,6 +36,9 @@
 #include "DebugRenderer.h"
 #include "Param.h"
 #include "CollisionShape.h"
+#include "SoundSource.h"
+#include "ResourceCache.h"
+#include "Sound.h"
 
 namespace Urho3D
 {
@@ -120,7 +123,7 @@ void Character::FixedUpdate(float timeStep)
     // Velocity on the XZ plane
     Vector3 planeVelocity(velocity.x_, 0.0f, velocity.z_);
 
-	if (inAirTimer_ > 2.0f)
+	if (inAirTimer_ > 20.0f)
 		isDead_ = true;
 
 	if (isDead_)
@@ -369,7 +372,7 @@ void Character::PostUpdate(float timeStep)
 		}
 	}
 
-	if (inTrigger_)
+	if (1/*inTrigger_*/)
 	{
 		Quaternion rot = GetNode()->GetWorldRotation();
 		controls_.pitch_ = rot.PitchAngle();
@@ -397,17 +400,22 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
 	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
 
 	// Check turn point
-	Variant var = otherNode->GetVar(GameVarirants::P_TURNPOINT);
+	Variant var = otherNode->GetVar(GameVariants::P_TURNPOINT);
 	if (!var.IsEmpty())
 	{
 		turnRequest_ = var.GetBool() && (turnState_ != NO_SUCCEEDED);
 	}
 
 	// Get coin points
-	var = otherNode->GetVar(GameVarirants::P_POINT);
+	var = otherNode->GetVar(GameVariants::P_POINT);
 	if (!var.IsEmpty())
 	{
 		score_ += var.GetInt();
+		// Create hit sound.
+		Sound* sound = GetSubsystem<ResourceCache>()->GetResource<Sound>("Sounds/NutThrow.wav");
+		SoundSource* soundSource = node_->GetOrCreateComponent<SoundSource>();
+		soundSource->Play(sound);
+		soundSource->SetAutoRemove(true);
 		otherNode->Remove();
 	}
 
@@ -435,7 +443,7 @@ void Character::HandleNodeCollisionStart(StringHash eventType, VariantMap& event
 	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
 
 	// Check turn point
-	Variant var = otherNode->GetVar(GameVarirants::P_TURNPOINT);
+	Variant var = otherNode->GetVar(GameVariants::P_TURNPOINT);
 	if (!var.IsEmpty())
 	{
 		turnRequest_ = var.GetBool() && (turnState_ != NO_SUCCEEDED);
@@ -443,10 +451,10 @@ void Character::HandleNodeCollisionStart(StringHash eventType, VariantMap& event
 	}
 
 	// Check current platform.
-	var = otherNode->GetVar(GameVarirants::P_ISINPLATFORM);
+	var = otherNode->GetVar(GameVariants::P_ISINPLATFORM);
 	if (!var.IsEmpty())
 	{
-		Node* enteringBlock = otherNode->GetParent()->GetParent();
+		Node* enteringBlock = otherNode->GetParent()->GetParent()->GetParent();
 
 		if (currentBlock_)
 		{
@@ -458,9 +466,14 @@ void Character::HandleNodeCollisionStart(StringHash eventType, VariantMap& event
 	}
 
 	// Check obstacles.
-	var = otherNode->GetVar(GameVarirants::P_ISOBSTACLE);
+	var = otherNode->GetVar(GameVariants::P_ISOBSTACLE);
 	if (!var.IsEmpty())
 	{
+		// Create dead sound.
+		Sound* sound = GetSubsystem<ResourceCache>()->GetResource<Sound>("Sounds/BigExplosion.wav");
+		SoundSource* soundSource = node_->GetOrCreateComponent<SoundSource>();
+		soundSource->Play(sound);
+		soundSource->SetAutoRemove(true);
 		isDead_ = true;
 	}
 }
@@ -471,7 +484,7 @@ void Character::HandleNodeCollisionEnd(StringHash eventType, VariantMap& eventDa
 
 	Node* otherNode = reinterpret_cast<Node*>(eventData[P_OTHERNODE].GetPtr());
 	// Check turn point
-	Variant var = otherNode->GetVar(GameVarirants::P_TURNPOINT);
+	Variant var = otherNode->GetVar(GameVariants::P_TURNPOINT);
 	if (!var.IsEmpty())
 	{
 		turnRequest_ = false;
@@ -583,10 +596,10 @@ bool Character::HasTurnRequest()
 		return false;
 
 	bool success = false;
-	int outs = currentBlock_->GetVar(GameVarirants::P_OUT).GetInt();
+	int outs = currentBlock_->GetVar(GameVariants::P_OUT).GetInt();
 	if (outs > 0) {
-		bool leftOut = currentBlock_->GetVar(GameVarirants::P_LEFTOUT).GetBool();
-		bool rightOut = currentBlock_->GetVar(GameVarirants::P_RIGHTOUT).GetBool();
+		bool leftOut = currentBlock_->GetVar(GameVariants::P_LEFTOUT).GetBool();
+		bool rightOut = currentBlock_->GetVar(GameVariants::P_RIGHTOUT).GetBool();
 
 		success = (leftOut && turnState_ == LEFT_SUCCEEDED) || (rightOut && turnState_ == RIGHT_SUCCEEDED);
 	}

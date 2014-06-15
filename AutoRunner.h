@@ -96,7 +96,7 @@ private:
 	void ResetGame();
 	void CreateLevel();
 	void UpdatePath(bool startIn = true);
-	String GetRandomCoinObjectName();
+	void InitBlockParameters();
 
 	bool isPlaying_;
 	unsigned int numBlocks_;
@@ -107,7 +107,8 @@ private:
 	Text* loadingText_;
 	Menu* gameMenu_;
 	Node* characterHead_;
-	PODVector<DebugLine> lines_;
-	PODVector<Sphere> spheres_;
+	Vector<DebugLine> lines_;
+	Vector<Sphere> spheres_;
+	Vector<String> blockNames_;
 
 };

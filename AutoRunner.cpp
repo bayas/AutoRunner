@@ -71,6 +71,8 @@
 #include "Profiler.h"
 #include "Sound.h"
 #include "SoundSource.h"
+#include "Animation.h"
+#include "AnimationState.h"
 
 #include "DebugNew.h"
 
@@ -156,9 +158,34 @@ void AutoRunner::InitScene()
 {
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 	FileSystem* fs = GetSubsystem<FileSystem>();
+	Vector<String> dirs = cache->GetResourceDirs();
+	String resourceDataDir = dirs[1];
 
 	scene_ = new Scene(context_);
-	File loadFile(context_, fs->GetProgramDir() + "Data/Scenes/AutoRunner.xml", FILE_READ);
+	// Create RunnerGameKit Scene to create all prefabs
+	if (cache->Exists("Data/RunnerGameKit_Scene.cfg"))
+	{
+		XMLFile* kitConfig = cache->GetResource<XMLFile>("Data/RunnerGameKit_Scene.cfg");
+		if (kitConfig->GetRoot())
+		{
+			// Load all block properties from Scene.cfg file
+			XMLElement rootElement = kitConfig->GetRoot();
+			assert(rootElement.HasChild("block"));
+			XMLElement blockElement = rootElement.GetChild("block");
+			// Traverse all Block nodes
+			for (XMLElement blockElement = rootElement.GetChild(); !blockElement.IsNull(); blockElement = blockElement.GetNext())
+			{
+				String blockName = blockElement.GetAttribute("name");
+				blockNames_.Push("Objects/" + blockName + ".xml");
+			}
+		}
+	}
+	else
+	{
+		InitBlockParameters();
+	}
+
+	File loadFile(context_, resourceDataDir + "Scenes/AutoRunner.xml", FILE_READ);
 	scene_->LoadXML(loadFile);
 
 	String platform = GetPlatform();
@@ -184,10 +211,6 @@ void AutoRunner::InitScene()
 	Node* soundNode = scene_->CreateChild("Sound");
 	SoundSource* soundSource = soundNode->CreateComponent<SoundSource>();
 	soundSource->Play(sound);
-	// In case we also play music, set the sound volume below maximum so that we don't clip the output
-	soundSource->SetGain(0.75f);
-	// Set the sound component to automatically remove its scene node from the scene when the sound is done playing
-	soundSource->SetAutoRemove(true);
 }
 
 void AutoRunner::CreateCharacter()
@@ -195,7 +218,7 @@ void AutoRunner::CreateCharacter()
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 	// Create root node of player
 	Node* objectNode = scene_->CreateChild("Player");
-	objectNode->SetPosition(Vector3(0.0f, 3.0f, 0.0f));
+	objectNode->SetPosition(Vector3(0.0f, 40.0f, 0.0f));
 	// Create model node
 	Node* modelNode = objectNode->CreateChild("PlayerModel");
 	modelNode->SetScale(Vector3(.4f, .4f, .4f));
@@ -322,7 +345,7 @@ void AutoRunner::HandleUpdate(StringHash eventType, VariantMap& eventData)
 	{
 		// Update path.
 		Vector3 point;
-		if (character_->GetNumPoints() <= 1 && character_->HasTurnRequest()) {
+		if (character_->GetNumPoints() <= 3/* && character_->HasTurnRequest()*/) {
 			UpdatePath(false);
 			character_->RemovePassedBlocks();
 
@@ -468,7 +491,7 @@ void AutoRunner::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
 	}
 
 	Quaternion rot = Quaternion(yawAngle, Vector3::UP);
-	Quaternion dir = rot * Quaternion(pitchAngle, Vector3::RIGHT);
+	Quaternion dir = rot * Quaternion(pitchAngle, Vector3::LEFT);
 
 	if (touch_->firstPerson_)
 	{
@@ -551,7 +574,7 @@ void AutoRunner::CreateLevel()
 {
 	int cnt = 3;
 	int maxRecursive = 30;
-	int maxBlockNumber = 6;
+	int maxBlockNumber = blockNames_.Size();
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
 
 	while (cnt > 0)
@@ -560,21 +583,29 @@ void AutoRunner::CreateLevel()
 		Quaternion blockRot = lastOutWorldRotation_;
 
 		// Initial transform has been given from out node.
-		int rnd = Random(maxBlockNumber) + 1;
+		unsigned int rnd = static_cast<unsigned int>(Random(maxBlockNumber));
 		// Set the starting platform.
 		if (numBlocks_ == 0)
-			rnd = 1;
+			rnd = 0;
 
-		String prefabName = "Objects/Block" + String(rnd) + ".xml";
+		String prefabName = blockNames_[rnd];
 		SharedPtr<File> fBlock1 = cache->GetFile(prefabName);
-		Node* blockNode = scene_->InstantiateXML(*fBlock1, blockPos, blockRot);
-		int outs = blockNode->GetVar(GameVarirants::P_OUT).GetInt();
+		Node* blockNode = scene_->InstantiateXML(*fBlock1, Vector3::ZERO, blockRot);
+		int outs = blockNode->GetVar(GameVariants::P_OUT).GetInt();
 
 		// And, then set actual transform of this block to get offset In node.
 		Node* inNode = blockNode->GetChild("In");
-		Vector3 offset = inNode->GetVar(GameVarirants::P_OFFSET).GetVector3();
-		Vector3 trans = inNode->GetWorldRotation() * offset;
-		blockNode->Translate(trans);
+		inNode->SetWorldPosition(blockPos);
+		inNode->SetWorldRotation(lastOutWorldRotation_);
+		//Vector3 offset = inNode->GetPosition();//inNode->GetVar(GameVarirants::P_OFFSET).GetVector3();
+		//Vector3 trans = inNode->GetWorldRotation() * offset;
+		//blockNode->Translate(-trans/*trans*/);
+
+		if (numBlocks_ == 0)
+		{
+			Vector3 pos = inNode->GetWorldPosition();
+			character_->GetNode()->SetWorldPosition(Vector3(pos.x_, 10.0f, pos.z_));
+		}
 
 		// Check obstacles before creating coins to prevent cycling path.
 		String posix = String::EMPTY;
@@ -587,7 +618,7 @@ void AutoRunner::CreateLevel()
 		}
 
 		bool accepted = true;
-		Node* outNode = blockNode->GetChild("Out" + posix);
+		Node* outNode = inNode->GetChild("Out" + posix);
 
 		while (twoWay > 0)
 		{
@@ -625,53 +656,30 @@ void AutoRunner::CreateLevel()
 		if (!accepted)
 			continue;
 
-		// Create coins in appropriate slots.
-		Node* slots = blockNode->GetChild("Slots");
-		PODVector<Node*> coinSlots;
-		PODVector<Node*> obstacleSlots;
-		for (unsigned int slotIndex = 0; slotIndex < slots->GetNumChildren(); slotIndex++)
+		// Choose group randomly.
+		Node* groups = blockNode->GetChild("Groups", true);
+		int numChildren = groups->GetNumChildren();
+		rnd = static_cast<unsigned int>(Random(numChildren));
+		for (unsigned int i = 0; i < groups->GetNumChildren(); i++)
 		{
-			Node* slot = slots->GetChild(slotIndex);
-			if (!slot->GetVar(GameVarirants::P_FITTOCOIN).IsEmpty())
-				coinSlots.Push(slot);
-			if (!slot->GetVar(GameVarirants::P_FITTOOBSTACLE).IsEmpty())
-				obstacleSlots.Push(slot);
-		}
-
-		if (numBlocks_ > 0 && !coinSlots.Empty())
-		{
-			int slotSize = coinSlots.Size() - 1;
-			int slotIndex = Random(slotSize);
-			Node* firstFit = coinSlots[slotIndex];
-			XMLFile* coinObj = cache->GetResource<XMLFile>(GetRandomCoinObjectName());
-
-			if (coinObj)
+			Node* groupNode = groups->GetChild(i);
+			if (i == rnd)
 			{
-				Node* coinNode = scene_->InstantiateXML(coinObj->GetRoot(), firstFit->GetWorldPosition(), firstFit->GetWorldRotation());
-				coinNode->SetParent(blockNode);
-			}
-		}
-
-		// Create obstacles in appropriate slots.
-		if (numBlocks_ > 0 && !obstacleSlots.Empty())
-		{
-			//int slotSize = obstacleSlots.Size();
-			//int slotIndex = Urho3D::Clamp(Random(slotSize), 0, slotSize - 1);
-			for (unsigned int slotIndex = 0; slotIndex < obstacleSlots.Size(); slotIndex++)
-			{
-				Node* firstFit = obstacleSlots[slotIndex];
-				XMLFile* obstacleObj = cache->GetResource<XMLFile>("Objects/Obstacle1.xml");
-
-				if (obstacleObj)
+				for (unsigned int itemIndex = 0; itemIndex < groupNode->GetNumChildren(); itemIndex++)
 				{
-					Vector3 pos = firstFit->GetWorldPosition();
-					if (firstFit->GetVars().Size() > 1)
-						pos.y_ += 1.0f;
-
-					Node* obstacleNode = scene_->InstantiateXML(obstacleObj->GetRoot(), pos, firstFit->GetWorldRotation());
-					obstacleNode->SetParent(blockNode);
+					Node* itemNode = groupNode->GetChild(itemIndex);
+					bool isAnimated = itemNode->GetVar(GameVariants::P_ISANIMATED).GetBool();
+					if (isAnimated)
+					{
+						AnimationController* aCtrl = itemNode->CreateComponent<AnimationController>();
+						aCtrl->Play("AnimStackTake 001.ani", 0, true, 0.2f);
+					}
 				}
+
+				continue;
 			}
+
+			groupNode->SetEnabled(false, true);
 		}
 
 		cnt--;
@@ -680,14 +688,14 @@ void AutoRunner::CreateLevel()
 
 		// If the last block is the straight then,
 		// Go ahead creating the block until the last block is turned one.
-		if (cnt == 0 && (rnd == 1 || rnd == 5 || rnd == 6 || rnd == 7))
+		if (cnt == 0 && outs == 0)
 		{
 			// TODO: You should check the length of straight path.
-			cnt++;
+			//cnt++;
 		}
 
 		// If the block is the last one that has two way turned, then set the cnt is zero.
-		if (rnd == 4)
+		if (outs >= 2)
 			cnt = 0;
 
 		lastOutWorldPosition_ = outNode->GetWorldPosition();
@@ -706,9 +714,9 @@ void AutoRunner::UpdatePath(bool startIn)
 	while (blocks_.Size() > 0)
 	{
 		Node* block = blocks_.Front();
-		int outs = block->GetVar(GameVarirants::P_OUT).GetInt();
+		int outs = block->GetVar(GameVariants::P_OUT).GetInt();
 
-		Node* paths = block->GetChild("Paths");
+		Node* paths = block->GetChild("Paths", true);
 		String posix = (startIn || outs == 0) ? "In" : "Out";
 		// Check the block whether it has two way outs or not, 
 		// then add the "L" or "R" to the posix.
@@ -791,19 +799,14 @@ void AutoRunner::UpdatePath(bool startIn)
 	character_->AddToPath(CENTER_SIDE, centerPoints);
 }
 
-String AutoRunner::GetRandomCoinObjectName()
+void AutoRunner::InitBlockParameters()
 {
-	String coinObjName = String::EMPTY;
-	int point = Random(1, 10);
-
-	if (point == 1)
-		coinObjName = "Objects/CoinRed.xml";
-	else if (point == 5)
-		coinObjName = "Objects/CoinGold.xml";
-	else
-		coinObjName = "Objects/CoinBlue.xml";
-
-	return coinObjName;
+	blockNames_.Push("Objects/Block1.xml");
+	//blockNames_.Push("Objects/Block2.xml");
+	//blockNames_.Push("Objects/Block3.xml");
+	//blockNames_.Push("Objects/Block4.xml");
+	blockNames_.Push("Objects/Block5.xml");
+	blockNames_.Push("Objects/Block6.xml");
 }
 
 void AutoRunner::CreateUI()
@@ -897,7 +900,7 @@ void AutoRunner::InitGame()
 
 	// Set initial parameters
 	lastOutWorldPosition_ = Vector3(0.0f, 0.0f, -2.0f);
-	lastOutWorldRotation_ = Quaternion(90, Vector3(0, 1, 0));
+	lastOutWorldRotation_ = Quaternion(90, Vector3(1, 0, 0));
 	yaw_ = pitch_ = 0.0f;
 	scoreText_->SetText("Score 0");
 

@@ -1,8 +1,9 @@
 #include "Object.h"
 #include "Str.h"
 
-namespace GameVarirants
+namespace GameVariants
 {
+	PARAM(P_IN, In);
 	PARAM(P_OUT, Out);
 	PARAM(P_LEFTOUT, LeftOut);
 	PARAM(P_RIGHTOUT, RightOut);
@@ -13,4 +14,5 @@ namespace GameVarirants
 	PARAM(P_TURNPOINT, TurnPoint);
 	PARAM(P_ISINPLATFORM, IsInPlatform);
 	PARAM(P_ISOBSTACLE, IsObstacle);
+	PARAM(P_ISANIMATED, IsAnimated);
 }
